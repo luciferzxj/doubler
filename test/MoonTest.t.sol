@@ -94,15 +94,7 @@ contract MoonTest is Test{
     function testDaiCreatePool()public{
         testCreateFactory();
         vm.startPrank(owner);
-        factory.createMoonPool(DAI);
-        assertEq(factory.moonPools().length,1);
-        moon = IMoonPool(factory.moonPools()[0]);
-        vm.stopPrank();
-    }
-
-    function testDaiStart()public{
-        testDaiCreatePool();
-        vm.startPrank(owner);
+        // vm.startPrank(owner);
         doubler.createDoubler(USDT);
         doubler.createDoubler(USDC);
         doubler.createDoubler(OP);
@@ -110,15 +102,37 @@ contract MoonTest is Test{
         rules[0] = IMoonPool.InputRule(USDT,100,200,50,10000,50,10000,50,10000,5,200);
         rules[1] = IMoonPool.InputRule(USDC,110,190,100,5000,50,10000,200,9000,10,300);
         rules[2] = IMoonPool.InputRule(OP,100,200,50,10000,50,10000,50,10000,5,200);
-        IERC20(DAI).approve(address(moon),100000 ether);
+        IERC20(DAI).approve(address(factory),100000 ether);
         // console.log(IERC20(DAI).balanceOf(owner));
-        moon.start(rules,60 days,1000000 ether,100000 ether);
+        // moon.start(rules,60 days,1000000 ether,100000 ether);
+        factory.createMoonPool(DAI,rules,60 days,1000000 ether,100000 ether);
+        assertEq(factory.moonPools().length,1);
+        moon = IMoonPool(factory.moonPools()[0]);
         assertEq(IERC20(address(moon)).balanceOf(owner),102000 ether);
+        // assertEq(factory.moonPools().length,1);
+        // moon = IMoonPool(factory.moonPools()[0]);
         vm.stopPrank();
     }
 
+    // function testDaiStart()public{
+    //     testDaiCreatePool();
+    //     vm.startPrank(owner);
+    //     doubler.createDoubler(USDT);
+    //     doubler.createDoubler(USDC);
+    //     doubler.createDoubler(OP);
+    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
+    //     rules[0] = IMoonPool.InputRule(USDT,100,200,50,10000,50,10000,50,10000,5,200);
+    //     rules[1] = IMoonPool.InputRule(USDC,110,190,100,5000,50,10000,200,9000,10,300);
+    //     rules[2] = IMoonPool.InputRule(OP,100,200,50,10000,50,10000,50,10000,5,200);
+    //     IERC20(DAI).approve(address(moon),100000 ether);
+    //     // console.log(IERC20(DAI).balanceOf(owner));
+    //     moon.start(rules,60 days,1000000 ether,100000 ether);
+    //     assertEq(IERC20(address(moon)).balanceOf(owner),102000 ether);
+    //     vm.stopPrank();
+    // }
+
     function testDaiDeposit()public{
-        testDaiStart();
+        testDaiCreatePool();
         // testCreatePool();
         vm.startPrank(user1);
         IERC20(DAI).approve(address(moon),100000 ether);
@@ -212,6 +226,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
         vm.stopPrank();
     }
     function testGainDai2()public{
@@ -229,6 +244,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
         vm.stopPrank();
     }
     function testGainDai3()public{
@@ -246,6 +262,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
         vm.stopPrank();
     }
 
@@ -254,14 +271,6 @@ contract MoonTest is Test{
     function testUSDTCreatePool()public{
         testCreateFactory();
         vm.startPrank(owner);
-        factory.createMoonPool(USDT);
-        moon = IMoonPool(factory.moonPools()[0]);
-        vm.stopPrank();
-    }
-
-    function testUSDTStart()public{
-        testUSDTCreatePool();
-        vm.startPrank(owner);
         doubler.createDoubler(STG);
         doubler.createDoubler(OP);
         doubler.createDoubler(WETH);
@@ -269,15 +278,33 @@ contract MoonTest is Test{
         rules[0] = IMoonPool.InputRule(STG,100,200,50,10000,50,10000,50,10000,5,200);
         rules[1] = IMoonPool.InputRule(OP,110,190,100,5000,50,10000,200,9000,10,300);
         rules[2] = IMoonPool.InputRule(WETH,100,200,50,10000,50,10000,50,10000,5,200);
-        IERC20(USDT).approve(address(moon),100000*10**6);
-        // console.log(IERC20(DAI).balanceOf(owner));
-        moon.start(rules,60 days,1000000*10**6,100000*10**6);
+        IERC20(USDT).approve(address(factory),100000*10**6);
+        factory.createMoonPool(USDT,rules,60 days,1000000*10**6,100000*10**6);
+        assertEq(factory.moonPools().length,1);
+        moon = IMoonPool(factory.moonPools()[0]);
         assertEq(IERC20(address(moon)).balanceOf(owner),102000*10**6);
         vm.stopPrank();
     }
 
+    // function testUSDTStart()public{
+    //     testUSDTCreatePool();
+    //     vm.startPrank(owner);
+    //     doubler.createDoubler(STG);
+    //     doubler.createDoubler(OP);
+    //     doubler.createDoubler(WETH);
+    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
+    //     rules[0] = IMoonPool.InputRule(STG,100,200,50,10000,50,10000,50,10000,5,200);
+    //     rules[1] = IMoonPool.InputRule(OP,110,190,100,5000,50,10000,200,9000,10,300);
+    //     rules[2] = IMoonPool.InputRule(WETH,100,200,50,10000,50,10000,50,10000,5,200);
+    //     IERC20(USDT).approve(address(moon),100000*10**6);
+    //     // console.log(IERC20(DAI).balanceOf(owner));
+    //     moon.start(rules,60 days,1000000*10**6,100000*10**6);
+    //     assertEq(IERC20(address(moon)).balanceOf(owner),102000*10**6);
+    //     vm.stopPrank();
+    // }
+
     function testUSDTDeposit()public{
-        testUSDTStart();
+        testUSDTCreatePool();
         // testCreatePool();
         vm.startPrank(user1);
         IERC20(USDT).approve(address(moon),100000 *10**6);
@@ -362,6 +389,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
         vm.stopPrank();
     }
     function testGainUSDT2()public{
@@ -379,6 +407,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
         vm.stopPrank();
     }
     function testGainUSDT3()public{
@@ -396,6 +425,7 @@ contract MoonTest is Test{
         // console.log(IERC20(DAI).balanceOf(address(moon)));
         moon.gain(1,para);
         assertEq(moon.poolInfo().pendingValue,0);
+        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
         vm.stopPrank();
     }
 }
