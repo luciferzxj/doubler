@@ -58,10 +58,57 @@ contract Factory is Context, IMoonPoolFactory {
         isSupported[usdt] = true;
     }
 
-    function createMoonPool(address _srcAsset) external {
+    function createMoonPool(address _srcAsset,MoonPool.InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external {
         require(isSupported[_srcAsset], '');
+        _init(_srcAsset);
+        {
+            IMoonPool pool = IMoonPool(_moonPools[_moonPools.length-1]);
+            IERC20(_srcAsset).transferFrom(msg.sender,address(this),_initAmount);
+            IERC20(_srcAsset).approve(address(pool),_initAmount);
+        }
+        
+        // {string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
+        
+        // // string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
+        
+        // MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer,1000);
+        // _moonPools.push(address(pool));
+        // pool.initialize(
+        //     _msgSender(),
+        //     _cfg.dev,
+        //     _cfg.dbr,
+        //     _cfg.doubler,
+        //     _cfg.dbrFarm,
+        //     _cfg.nft,
+        //     _cfg.oneInchAggregator,
+        //     _cfg.oneInchExecutor,
+        //     _srcAsset
+        // );
+        // }
+
+        _start(
+            _rules,
+            _duration,
+            _cap,
+            _initAmount
+        );
+        
+    }
+    function _start(MoonPool.InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount)internal{
+        IMoonPool pool = IMoonPool(_moonPools[_moonPools.length-1]);
+        
+        pool.start(
+            _rules,
+            _duration,
+            _cap,
+            _initAmount
+        );
+    }
+
+    function _init(address _srcAsset)internal{
         string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
-        MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer);
+        // string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
+        MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer,1000);
         _moonPools.push(address(pool));
         pool.initialize(
             _msgSender(),

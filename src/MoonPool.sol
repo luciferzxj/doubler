@@ -29,11 +29,13 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
     address constant WETH = 0x4200000000000000000000000000000000000006;
     uint256 private constant RATIO_PRECISION = 10000; // 100 * 100
     uint256 private constant KEEPER_REWARD_PRECENT = 100;
+    uint256 private constant CREATOR_REWARD_MAX = 2000;
     uint256 private constant FEE = 200;
     uint256 private constant SCAN = 1e18;
 
     // address private _developer;
     address private _signer;
+    uint256 private creatorRewardRatio;
 
     uint256 private constant END_LIMIT = 30 days;
 
@@ -55,9 +57,11 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
 
     mapping(bytes32 => bool) private _usedSignature;
 
-    constructor(string memory name, string memory symbol, address singer) ERC20(name, symbol) {
+    constructor(string memory name, string memory symbol, address singer,uint256 _creatorRewardRatio) ERC20(name, symbol) {
         factory = _msgSender();
         _signer = singer;
+        require(_creatorRewardRatio<=CREATOR_REWARD_MAX,'ratio too much');
+        creatorRewardRatio = _creatorRewardRatio;
     }
     receive()external payable{
         require(msg.sender==_poolCfg.oneInch||msg.sender==_poolCfg.doubler);
@@ -110,7 +114,7 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
     }
 
     function start(InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external {
-        require(!_pool.started && _msgSender() == _poolCfg.creator, 'pool is runing');
+        require(!_pool.started && _msgSender() == factory, 'pool is runing');
         require(_initAmount >= 100000 * (10 ** IERC20Metadata(_poolCfg.asset).decimals()), 'amount min err');
         require(_duration >= END_LIMIT, 'endTime err');
         require(_cap >= _initAmount, 'cap err');
@@ -130,7 +134,7 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
         _pool.endTime = block.timestamp + _duration;
         _pool.capMax = _cap;
         _pool.started = true;
-        _deposite(_initAmount);
+        _deposite(_initAmount,_poolCfg.creator);
         emit NewPool(_msgSender(), address(this));
     }
 
@@ -167,7 +171,7 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
 
     function deposite(uint256 _amount) external {
         require(block.timestamp <= _pool.endTime, '_pool was ended');
-        _deposite(_amount);
+        _deposite(_amount,msg.sender);
     }
 
     function _getLPValue() internal view returns (uint256) {
@@ -193,7 +197,7 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
         return (lpTotal * SCAN) / valueTotal;
     }
 
-    function _deposite(uint256 _amount) internal {
+    function _deposite(uint256 _amount,address to) internal {
         require(
             IERC20(_poolCfg.asset).balanceOf(address(this)) + _pool.pendingValue + _amount < _pool.capMax,
             'capMax error'
@@ -212,8 +216,9 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
                 100;
         }
         IERC20(_poolCfg.asset).safeTransferFrom(_msgSender(), address(this), _amount);
-        _mint(_msgSender(), (uValue * (_amount + extra)) / SCAN);
-        emit Deposite(_msgSender(), _amount, (uValue * (_amount + extra)) / SCAN);
+
+        _mint(to, (uValue * (_amount + extra)) / SCAN);
+        emit Deposite(to, _amount, (uValue * (_amount + extra)) / SCAN);
     }
 
     function withdraw(uint256 _lpAmount) external {
@@ -406,6 +411,9 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
         _pool.pendingValue -= record.spend;
         _pool.dbrAmount += mintDbr;
         (uint256 returnAmount, ) = mySwap(desc, datas);
+        if(returnAmount>record.spend){
+            IERC20(_poolCfg.asset).transfer(_poolCfg.creator,(returnAmount-record.spend)*creatorRewardRatio/RATIO_PRECISION);
+        }
         emit Gain(_tokenId, record.spend, returnAmount, mintDbr);
     }
 
