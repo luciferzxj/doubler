@@ -57,6 +57,7 @@ interface IMoonPool {
         bytes32 mask;
         bytes data;
         bytes signature;
+        bytes inData;
     }
 
     event NewPool(address creator, address lp);
@@ -118,4 +119,5 @@ interface IMoonPool {
     function poolInfo() external view returns (Pool memory pool);
 
     function ruleMap(address asset) external view returns (InputRule memory rule);
+    function tokenMuch()external view returns(uint256);
 }

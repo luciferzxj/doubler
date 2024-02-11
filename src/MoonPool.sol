@@ -57,6 +57,9 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
 
     mapping(bytes32 => bool) private _usedSignature;
 
+    mapping(address => uint256) private tokenBal;
+
+    uint256 public tokenMuch;
     constructor(string memory name, string memory symbol, address singer,uint256 _creatorRewardRatio) ERC20(name, symbol) {
         factory = _msgSender();
         _signer = singer;
@@ -291,14 +294,63 @@ contract MoonPool is IMoonPool, ERC20, AccessControlEnumerable, ReentrancyGuard 
         _inputLayer[nhash] = true;
         (uint256 returnAmount, uint256 spentAmount) = mySwap(desc, datas);
         if(address(desc.dstToken) == ETH){
-            payable(_poolCfg.doubler).call{value : returnAmount}('');
+            payable(_poolCfg.doubler).call{value : desc.minReturnAmount}('');
         }else{
-            desc.dstToken.approve(_poolCfg.doubler,returnAmount);
+            desc.dstToken.approve(_poolCfg.doubler,desc.minReturnAmount);
         }
-        _input(spentAmount, returnAmount, _doublerId, doubler, doubler.asset);
+        _input(spentAmount, desc.minReturnAmount, _doublerId, doubler, doubler.asset);
+        if(returnAmount-desc.minReturnAmount>0){
+            tokenBal[doubler.asset] += returnAmount-desc.minReturnAmount;
+            if(doubler.asset == ETH && doubler.asset == WETH){
+                if(doubler.asset == ETH){
+                    IWETH(WETH).deposit{value :tokenBal[doubler.asset]}();
+                }
+                if(tokenBal[doubler.asset]>=1 ether){
+                    desc.srcToken = IERC20(WETH);
+                    desc.dstToken = IERC20(_poolCfg.asset);
+                    desc.amount = tokenBal[doubler.asset];
+                    desc.minReturnAmount = 10;
+                    (returnAmount,spentAmount)=inSwap(desc,datas);
+                }
+            }else{
+                if(tokenBal[doubler.asset]>=100 *10** IERC20Metadata(doubler.asset).decimals()){
+                    desc.srcToken = IERC20(doubler.asset);
+                    desc.dstToken = IERC20(_poolCfg.asset);
+                    desc.amount = tokenBal[doubler.asset];
+                    desc.minReturnAmount = 10;
+                    (returnAmount,spentAmount)=inSwap(desc,datas);
+                }
+            }
+            tokenBal[doubler.asset] = 0;
+            tokenMuch+=returnAmount;
+        }
         // todo : transfer reward to keeper
         uint256 sendDbrAmount = (_pool.dbrAmount * KEEPER_REWARD_PRECENT) / RATIO_PRECISION;
         IERC20(_poolCfg.dbr).safeTransferFrom(address(this), _msgSender(), sendDbrAmount);
+    }
+    function inSwap(
+        IOneInch.SwapDescription memory desc,
+        SignatureParams memory datas
+    ) internal returns (uint256 returnAmount, uint256 spentAmount) {
+        if (address(desc.srcToken) != ETH) {
+            desc.srcToken.approve(address(_poolCfg.oneInch), desc.amount);
+        }
+        if(address(desc.srcToken)== ETH){
+            (returnAmount, spentAmount) = IOneInch(_poolCfg.oneInch).swap{value : desc.amount}(
+                IAggregationExecutor(_poolCfg.oneInchExcutor),
+                desc,
+                abi.encodePacked(''),
+                datas.inData
+            );
+        }else{
+            // desc.srcToken.approve(_poolCfg.oneInch,desc.amount);
+            (returnAmount, spentAmount) = IOneInch(_poolCfg.oneInch).swap(
+                IAggregationExecutor(_poolCfg.oneInchExcutor),
+                desc,
+                abi.encodePacked(''),
+                datas.inData
+            );
+        }
     }
 
     function mySwap(
