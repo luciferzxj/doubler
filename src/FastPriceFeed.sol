@@ -10,7 +10,8 @@ import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
 import '@openzeppelin/contracts/utils/math/Math.sol';
 import '@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol';
-
+import '@pythnetwork/pyth-sdk-solidity/IPyth.sol';
+import '@pythnetwork/pyth-sdk-solidity/PythStructs.sol';
 import './interfaces/IUniswapV3Pool.sol';
 import './interfaces/IFastPriceFeed.sol';
 
@@ -189,6 +190,10 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
     mapping(address => Plan) private _plans;
     mapping(address => PriceLimit) private _priceLimits;
 
+    mapping(address =>bytes32) internal _pythAssetPriceIdMap;
+    mapping(address =>address) internal _pythAssetMap;
+
+
     constructor(address _initMultiSigWallet) {
         _grantRole(DEFAULT_ADMIN_ROLE, _initMultiSigWallet);
     }
@@ -196,6 +201,24 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
     modifier isSupportedToken(address _asset) {
         require(_isSupported[_asset], "invalid token");
         _;
+    }
+
+     function initPyhonPriceFeed(address _asset, address _oracleAddr,  bytes32 priceId) internal {
+        _pythAssetPriceIdMap[_asset] = priceId;
+        _pythAssetMap[_asset]   = _oracleAddr;
+        //check priceId 
+        PythStructs.Price memory _price = IPyth( _pythAssetMap[_oracleAddr]).getPrice(priceId);
+        require(_price.price > 0, "priceId error");
+        emit InitPyhonPriceFeed(_asset, _oracleAddr, priceId);
+    }
+
+    function getPytPrice(address _token) public view returns (uint256 price) {
+        bytes32 priceId= _pythAssetPriceIdMap[_token];
+        PythStructs.Price memory _price = IPyth( _pythAssetMap[_token]).getPrice(priceId);
+        uint32 expo = uint32(_price.expo < 0 ? -_price.expo : _price.expo);
+        uint64 pythPrice = uint64(_price.price > 0 ? _price.price : -_price.price);
+        price = _priceDecimals.mul(pythPrice).div(10 ** expo);
+        return  price;
     }
 
     function getIsSupported(address _asset) external view returns(bool) {
@@ -235,6 +258,7 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
     function newAsset(
         address _asset,
         address _assetPriceFeed,
+        bytes32 _assetPriceId,  // only for pyth oracle
         uint32 _twapInterval,
         Plan _plan
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -243,25 +267,37 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         if (_plan == Plan.DEX) {
             initDexPriceFeed(_asset, _assetPriceFeed);
             _twapIntervals[_asset] = _twapInterval;
-        } else {
+        } else if (_plan == Plan.PYTH) {
+            initPyhonPriceFeed(_asset, _assetPriceFeed, _assetPriceId);
+        }  else {
             initChainlinkPriceFeed(_asset, _assetPriceFeed);
         }
         emit AddAsset(_asset, _assetPriceFeed, _twapInterval);
     }
 
-    function updatePriceAggregator(address _asset, address _aggregator) external  isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updatePriceAggregator(address _asset, address _aggregator, bytes32 _priceId) external  isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_aggregator != address(0), "zero address");
         if (_plans[_asset] == Plan.DEX) {
             initDexPriceFeed(_asset, _aggregator);
+        } if (_plans[_asset] == Plan.PYTH) {
+            initPyhonPriceFeed(_asset, _aggregator, _priceId);
         } else {
             initChainlinkPriceFeed(_asset, _aggregator);
         }
     }
 
-    function upgradePlan(address _asset, address _aggregator, Plan _plan) external isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_plans[_asset] == Plan.DEX, "only DEX mode");
+    function upgradePlan(address _asset, address _aggregator, Plan _plan, bytes32 _priceId) external isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
+        // todo remove limit;
+        // require(_plans[_asset] == Plan.DEX, "only DEX mode");
         require(_aggregator != address(0), "zero address");
-        initChainlinkPriceFeed(_asset, _aggregator);
         _plans[_asset] = _plan;
+        if (_plan == Plan.DEX) {
+            initDexPriceFeed(_asset, _aggregator);
+        } if (_plans[_asset] == Plan.PYTH) {
+            initPyhonPriceFeed(_asset, _aggregator, _priceId);
+        }  else {
+             initChainlinkPriceFeed(_asset, _aggregator);
+        }
         emit UpgradePlan(_asset, _aggregator);
     }
 
@@ -347,14 +383,17 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
             if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
                 pl = Plan.DEX;
             }
-        }
-        if (pl == Plan.DEX) {
+         } else if (pl == Plan.PYTH) {
+            price = getPytPrice(_asset);
+            if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
+                pl = Plan.DEX;
+            }
+        } else if (pl == Plan.DEX) {
             price = getPriceFromDex(_asset);
             if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
                 revert();
             }
-        }
-        if (_plans[_asset] == Plan.OTHER) {
+        } else if (_plans[_asset] == Plan.OTHER) {
             revert();
         }
     }
@@ -366,7 +405,5 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
     function isSupported(address _token) external view returns (bool) {
         return _isSupported[_token];
     }
-
-
 
 }

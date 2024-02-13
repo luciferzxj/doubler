@@ -214,7 +214,7 @@ contract FRNFT is AccessControlEnumerable, IERC721Enumerable, ERC721Pausable, ER
         address owner,
         uint256 offset,
         uint256 limit
-    ) public view virtual returns (TraitsView[] memory traitsView) {
+    ) external view returns (TraitsView[] memory traitsView) {
         require(offset < ERC721.balanceOf(owner), 'ERC721Enumerable: owner index out of bounds');
         limit = (offset + limit) < ERC721.balanceOf(owner) ? limit : ERC721.balanceOf(owner) - offset;
         traitsView = new TraitsView[](limit);

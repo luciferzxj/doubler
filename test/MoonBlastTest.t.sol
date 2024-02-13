@@ -1,24 +1,22 @@
 pragma solidity ^0.8.12;
 import 'forge-std/Test.sol';
-// import 'forge-std/StdCheats.sol';
 import 'forge-std/console.sol';
 import '../src/MoonPoolBlast.sol';
-// import '../src/Doubler.sol';
 import '../src/FRNFT.sol';
 import '../src/LP.sol';
 import '../src/MoonPoolBlastFactory.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 contract MoonTestBlast is Test{
-    //网络rpc
+    //rpc
     string constant OP_testBlast= 'https://opt-sepolia.g.alchemy.com/v2/vdFQmXEt1j8hW791DhizA5NdMlTQlAxC';
     string private OPT_RPC = 'https://opt-mainnet.g.alchemy.com/v2/jTyU-Rhb3RrfCDBAI2H1Jr6sgAeH0Fal';
-    //EOA地址
+    
     address signer = 0x56865ed38a0e9B4C517F1612057A90E6143FBD87;
     address developer = makeAddr('developer');
     address owner = makeAddr('owner');
     address user1 = makeAddr('user1');
-    //代币地址
+    
     address USDC = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;//6
     address DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
     address USDT = 0x94b008aA00579c1307B0EF2c499aD98a8ce58e58;//6
@@ -26,7 +24,6 @@ contract MoonTestBlast is Test{
     address STG = 0x296F55F8Fb28E498B858d0BcDA06D955B2Cb3f97;
     address constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address constant WETH = 0x4200000000000000000000000000000000000006;
-    //合约
     ISwapRouter router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     // address executor = 0xB63AaE6C353636d66Df13b89Ba4425cfE13d10bA;
     Factory factory;
@@ -35,8 +32,8 @@ contract MoonTestBlast is Test{
     Token dbr;
     FRNFT fr;
     IMoonPool moon;
+
     function setUp()public{
-        //环境构造
         vm.createSelectFork(OPT_RPC);
         // deal(USDC,owner,100000 * 10**6);
         deal(USDT,owner,100000 * 10**6);
@@ -63,7 +60,6 @@ contract MoonTestBlast is Test{
     // }
     function testBlastCreateFactory()public{
         vm.startPrank(owner);
-        //合约创建
         address[] memory tokens = new address[](7);
         tokens[0]=USDC;
         tokens[1]=DAI;
@@ -91,7 +87,7 @@ contract MoonTestBlast is Test{
         factory = new Factory(cfg,DAI,USDC,USDT);
         vm.stopPrank();
     }
-    //DAI池
+    //DAI
     function testBlastDaiCreatePool()public{
         testBlastCreateFactory();
         vm.startPrank(owner);
@@ -117,23 +113,6 @@ contract MoonTestBlast is Test{
         // moon = IMoonPool(factory.moonPools()[0]);
         vm.stopPrank();
     }
-
-    // function testBlastDaiStart()public{
-    //     testBlastDaiCreatePool();
-    //     vm.startPrank(owner);
-    //     doubler.createDoubler(USDT);
-    //     doubler.createDoubler(USDC);
-    //     doubler.createDoubler(OP);
-    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
-    //     rules[0] = IMoonPool.InputRule(USDT,100,200,50,10000,50,10000,50,10000,5,200);
-    //     rules[1] = IMoonPool.InputRule(USDC,110,190,100,5000,50,10000,200,9000,10,300);
-    //     rules[2] = IMoonPool.InputRule(OP,100,200,50,10000,50,10000,50,10000,5,200);
-    //     IERC20(DAI).approve(address(moon),100000 ether);
-    //     // console.log(IERC20(DAI).balanceOf(owner));
-    //     moon.start(rules,60 days,1000000 ether,100000 ether);
-    //     assertEq(IERC20(address(moon)).balanceOf(owner),102000 ether);
-    //     vm.stopPrank();
-    // }
 
     function testBlastDaiDeposit()public{
         testBlastDaiCreatePool();
@@ -276,7 +255,7 @@ contract MoonTestBlast is Test{
     }
 
 
-    //USDT池
+    //USDT
     function testBlastUSDTCreatePool()public{
         testBlastCreateFactory();
         vm.startPrank(owner);

@@ -12,13 +12,13 @@ interface IMoonPoolFactory {
         address dbr;
         address dbrFarm;
         address nft;
-        address oneInchAggregator;
-        address oneInchExecutor;
+        address uniswapV3Router;
     }
 
     function moonPools() external view returns (address[] memory _pools);
 
     function allMoonPoolLength() external view returns (uint);
 
-    event UpdateOneInchConfig(address oneInch, address excutor);
+    event UpdateUniswapConfig(address router);
+    event CreateMoonPool(address moonPool);
 }

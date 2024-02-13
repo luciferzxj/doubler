@@ -17,16 +17,17 @@ interface IMoonPool {
     // map (pooId => map(asset => InputRule))
     struct InputRule {
         address asset;
-        uint16 fallRatioMin;//100
-        uint16 fallRatioMax;//200
-        uint16 profitRatioMin;//50
-        uint16 profitRatioMax;//10000
+        uint16 fallRatioMin;
+        uint16 fallRatioMax;
+        uint16 profitRatioMin;
+        uint16 profitRatioMax;
         uint16 rewardRatioMin;
-        uint16 rewardRatioMax;//10000
+        uint16 rewardRatioMax;
         uint16 winnerRatioMin;
-        uint16 winnerRatioMax;//10000
-        uint256 tvl;//>0
-        uint256 layerInputMax;//>100
+        uint16 winnerRatioMax;
+        uint256 tvl;
+        uint256 layerInputMax;
+        uint24 fee;
     }
 
     // map(pooId => map(tokenId => Bill))
@@ -45,8 +46,7 @@ interface IMoonPool {
         address dbr;
         address dbrFarm;
         address FRNFT;
-        address oneInch;
-        address oneInchExcutor;
+        address uniswapV3Router;
     }
 
     struct SignatureParams {
@@ -57,7 +57,7 @@ interface IMoonPool {
         bytes32 mask;
         bytes data;
         bytes signature;
-        bytes inData;
+        uint24 fee;
     }
 
     event NewPool(address creator, address lp);
@@ -87,7 +87,6 @@ interface IMoonPool {
     );
     event Gain(uint256 tokenIds, uint256 spend, uint256 uSell, uint256 mintDbr);
 
-    // function newPool(AddPool calldata _addPool) external;
     function initialize(
         address _creator,
         address _dev,
@@ -95,12 +94,17 @@ interface IMoonPool {
         address _doublerContract,
         address _dbrFarmContract,
         address _nft,
-        address _aggragator,
-        address _excutor,
+        address _router,
         address _srcAsset
     ) external;
 
-    function start(InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external;
+    function start(
+        InputRule[] calldata _rules,
+        uint256 _duration,
+        uint256 _cap,
+        uint256 _initAmount,
+        uint256 _rewardRatio
+    ) external;
 
     function updateRule(InputRule calldata _inputRule) external;
 
@@ -119,5 +123,6 @@ interface IMoonPool {
     function poolInfo() external view returns (Pool memory pool);
 
     function ruleMap(address asset) external view returns (InputRule memory rule);
-    function tokenMuch()external view returns(uint256);
+
+    function tokenMuch() external view returns (uint256);
 }
