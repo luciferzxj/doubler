@@ -46,9 +46,4 @@ interface IFRNFT is IERC721 {
     ) external returns (uint256);
     function burnFrom(address from, uint256 tokenId) external;
     function isTokenOwner(uint256 tokenId, address user) external view returns (bool);
-    function getTokenList(
-        address owner,
-        uint256 offset,
-        uint256 limit
-    ) external view returns (TraitsView[] memory traitsView);
 }

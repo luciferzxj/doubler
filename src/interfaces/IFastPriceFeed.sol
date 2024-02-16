@@ -6,7 +6,6 @@ interface IFastPriceFeed {
     enum Plan {
         DEX,
         CHAINLINK,
-        PYTH,
         OTHER
     }
 
@@ -23,7 +22,6 @@ interface IFastPriceFeed {
     event SetDexPriceFeed(address asset, address univ3Pool);
     event SetTwapInterval(address asset, uint32 previous, uint32 present);
     event SetChainlinkAggregator(address asset, address aggregator);
-    event InitPyhonPriceFeed(address asset, address oracleAddr ,bytes32 priceFeed);
     
     function getPrice(address _asset) external  view returns (uint256 price);
 }

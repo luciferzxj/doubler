@@ -122,6 +122,7 @@ interface IDoubler {
         address initTeam,
         address initFastPriceFeed,
         address initDoublerNFT,
+        address initDbrTokenAddress,
         address initMultiSigWallet
     );
     event UpgradeReceiver(uint8 _type, address _receiver);

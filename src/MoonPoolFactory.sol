@@ -5,10 +5,10 @@ import '@openzeppelin/contracts/utils/Strings.sol';
 import '@openzeppelin/contracts/utils/Context.sol';
 
 import './MoonPool.sol';
-import './interfaces/IMoonPool.sol';
+// import './interfaces/IMoonPool.sol';
 import './interfaces/IMoonPoolFactory.sol';
 
-contract MoonPoolFactory is Context, IMoonPoolFactory {
+contract Factory is Context, IMoonPoolFactory {
     using Strings for uint256;
 
     address[] private _moonPools;
@@ -32,18 +32,18 @@ contract MoonPoolFactory is Context, IMoonPoolFactory {
         return _cfg.dbrFarm;
     }
 
-    function uniswapConfig() external view returns (address router) {
-        return _cfg.uniswapV3Router;
+    function aggregatorConfig() external view returns (address router) {
+        return _cfg.aggregator;
     }
 
-    function updateUniswapConfig(address router) public {
+    function updateAggregatorConfig(address router) public {
         require(_msgSender() == _cfg.dev, 'only dev');
-        _cfg.uniswapV3Router = router;
-        emit UpdateUniswapConfig(router);
+        _cfg.aggregator = router;
+        emit UpdateAggregatorConfig(router);
     }
 
     function moonPools() external view returns (address[] memory _pools) {
-        _pools = _moonPools;
+        _pools=_moonPools;
     }
 
     function allMoonPoolLength() external view returns (uint) {
@@ -57,45 +57,38 @@ contract MoonPoolFactory is Context, IMoonPoolFactory {
         isSupported[usdt] = true;
     }
 
-    function createMoonPool(address _srcAsset) external {
-        require(isSupported[_srcAsset], '');
-        string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
-        MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer);
-        _moonPools.push(address(pool));
-        pool.initialize(
-            _msgSender(),
-            _cfg.dev,
-            _cfg.dbr,
-            _cfg.doubler,
-            _cfg.dbrFarm,
-            _cfg.nft,
-            _cfg.uniswapV3Router,
-            _srcAsset
-        );
-        emit CreateMoonPool(address(pool));
-    }
-
-    function createMoonPool(
-        address _srcAsset,
-        MoonPool.InputRule[] calldata _rules,
-        uint256 _duration,
-        uint256 _cap,
-        uint256 _initAmount,
-        uint256 _rewardRatio
-    ) external {
+    function createMoonPool(address _srcAsset,MoonPool.InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external {
         require(isSupported[_srcAsset], '');
         _init(_srcAsset);
         {
-            IMoonPool pool = IMoonPool(_moonPools[_moonPools.length - 1]);
-            IERC20(_srcAsset).transferFrom(msg.sender, address(this), _initAmount);
-            IERC20(_srcAsset).approve(address(pool), _initAmount);
+            IMoonPool pool = IMoonPool(_moonPools[_moonPools.length-1]);
+            IERC20(_srcAsset).transferFrom(msg.sender,address(this),_initAmount);
+            IERC20(_srcAsset).approve(address(pool),_initAmount);
         }
-        _start(_rules, _duration, _cap, _initAmount, _rewardRatio);
+        
+        _start(
+            _rules,
+            _duration,
+            _cap,
+            _initAmount
+        );
+        
+    }
+    function _start(MoonPool.InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount)internal{
+        IMoonPool pool = IMoonPool(_moonPools[_moonPools.length-1]);
+        
+        pool.start(
+            _rules,
+            _duration,
+            _cap,
+            _initAmount
+        );
     }
 
-    function _init(address _srcAsset) internal {
+    function _init(address _srcAsset)internal{
         string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
-        MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer);
+        // string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
+        MoonPool pool = new MoonPool(lpName, lpName, _cfg.signer,1000);
         _moonPools.push(address(pool));
         pool.initialize(
             _msgSender(),
@@ -104,21 +97,9 @@ contract MoonPoolFactory is Context, IMoonPoolFactory {
             _cfg.doubler,
             _cfg.dbrFarm,
             _cfg.nft,
-            _cfg.uniswapV3Router,
-            _srcAsset
+            _cfg.aggregator,
+            _srcAsset,
+            _cfg.pricefeed
         );
-        emit CreateMoonPool(address(pool));
-    }
-
-    function _start(
-        MoonPool.InputRule[] calldata _rules,
-        uint256 _duration,
-        uint256 _cap,
-        uint256 _initAmount,
-        uint256 _rewardRatio
-    ) internal {
-        IMoonPool pool = IMoonPool(_moonPools[_moonPools.length - 1]);
-
-        pool.start(_rules, _duration, _cap, _initAmount, _rewardRatio);
     }
 }

@@ -46,6 +46,7 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
         address _initEco,
         address _initFastPriceFeed,
         address _initDoublerNFT,
+        address _initDbrTokenAddress,
         address _initMultiSigWallet,
         uint16 _initProtectBlock
     ) external onlyRole(INIT_ROLE) {
@@ -59,7 +60,7 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
         _feeRatio = 20; // 0.2% * 100
         _protectBlock = _initProtectBlock;
         _grantRole(DEFAULT_ADMIN_ROLE, _initMultiSigWallet);
-        emit Initialize(_initTeam, _initFastPriceFeed, _initDoublerNFT, _initMultiSigWallet);
+        emit Initialize(_initTeam, _initFastPriceFeed, _initDoublerNFT, _initDbrTokenAddress, _initMultiSigWallet);
     }
 
     function updateAssetConfig(address _to, bool _isOpen) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {

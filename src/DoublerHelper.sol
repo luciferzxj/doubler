@@ -42,8 +42,6 @@ contract DoublerHelper is
     address private _fastPriceFeed;
     address private _dbrFarm;
 
-    address[] private _fastPriceTokens;
-
     // for update
     function initialize() public initializer {
         __Ownable_init();
@@ -65,20 +63,6 @@ contract DoublerHelper is
         _FRNFT = _initFRNFT;
         _fastPriceFeed = _initFastPriceFeed;
         _dbrFarm = _initDbrFarm;
-    }
-
-    function updateFastPriceTokens(address[] calldata _initFastPriceTokens)  external onlyOwner {
-      _fastPriceTokens = _initFastPriceTokens;
-    }
-
-    function getTokens() external view returns (TokenMeta[] memory res) {
-        res = new TokenMeta[](_fastPriceTokens.length);
-        for (uint i = 0; i < _fastPriceTokens.length; i++) {
-            TokenMeta memory r = res[i];
-            r.token = _fastPriceTokens[i];
-            r.decimals = IERC20Metadata(r.token).decimals();
-            r.symbol = IERC20Metadata(r.token).symbol();
-        }
     }
 
     function getAddrView() external view returns (address, address, address, address) {
@@ -191,30 +175,5 @@ contract DoublerHelper is
 
     function getMaxMultiple(uint256 _poolId) external view returns (uint256 multiple) {
         multiple = IDoubler(_doublerAddress).getMaxMultiple(_poolId);
-    }
-
-    function getFarmNftList(
-        address owner,
-        uint256 offset,
-        uint256 limit
-    ) external view returns (NftFullView[] memory nftView) {
-        uint256[] memory tokenIds = IDBRFarm(_dbrFarm).getTokenIds(owner, offset, limit);
-        console.log("tokenIds.length", tokenIds.length);
-        nftView = new NftFullView[](tokenIds.length);
-        IFRNFT.Traits memory nft;
-        for (uint32 i = 0; i < tokenIds.length; ++i) {
-            nft = IFRNFT(_FRNFT).getTraits(tokenIds[i]);
-            nftView[i].tokenId = tokenIds[i];
-            nftView[i].layer = nft.layer;
-            nftView[i].poolId = nft.poolId;
-            nftView[i].margin = nft.margin;
-            nftView[i].amount = nft.amount;
-            nftView[i].price = nft.price;
-            nftView[i].layerRanking = nft.layerRanking;
-            (uint256 peending, uint256 boostReward, uint256 lastLayerReward) = IDBRFarm(_dbrFarm).getNftPendingTotal(tokenIds[i]);
-            nftView[i].dbrAmount  = peending + boostReward + lastLayerReward;
-            IDoubler.Pool memory pool = IDoubler(_doublerAddress).getPool(nft.poolId);
-            nftView[i].doublerEnd = pool.endPrice > 0 ? true : false;
-        }
     }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
-import './IOneInch.sol';
+// import './IOneInch.sol';
 
 interface IMoonPool {
     // map (pooId => Pool)
@@ -17,17 +17,16 @@ interface IMoonPool {
     // map (pooId => map(asset => InputRule))
     struct InputRule {
         address asset;
-        uint16 fallRatioMin;
-        uint16 fallRatioMax;
-        uint16 profitRatioMin;
-        uint16 profitRatioMax;
+        uint16 fallRatioMin;//100
+        uint16 fallRatioMax;//200
+        uint16 profitRatioMin;//50
+        uint16 profitRatioMax;//10000
         uint16 rewardRatioMin;
-        uint16 rewardRatioMax;
+        uint16 rewardRatioMax;//10000
         uint16 winnerRatioMin;
-        uint16 winnerRatioMax;
-        uint256 tvl;
-        uint256 layerInputMax;
-        uint24 fee;
+        uint16 winnerRatioMax;//10000
+        uint256 tvl;//>0
+        uint256 layerInputMax;//>100
     }
 
     // map(pooId => map(tokenId => Bill))
@@ -46,18 +45,13 @@ interface IMoonPool {
         address dbr;
         address dbrFarm;
         address FRNFT;
-        address uniswapV3Router;
+        address aggregator ;
+        address pricefeed;
     }
 
     struct SignatureParams {
-        uint256 amount;
-        uint256 minReturnAmount;
-        uint256 falgs;
-        uint256 deadline;
-        bytes32 mask;
-        bytes data;
-        bytes signature;
-        uint24 fee;
+        uint256 amountOut;
+        uint256 maxAmountIn;
     }
 
     event NewPool(address creator, address lp);
@@ -87,6 +81,7 @@ interface IMoonPool {
     );
     event Gain(uint256 tokenIds, uint256 spend, uint256 uSell, uint256 mintDbr);
 
+    // function newPool(AddPool calldata _addPool) external;
     function initialize(
         address _creator,
         address _dev,
@@ -95,16 +90,11 @@ interface IMoonPool {
         address _dbrFarmContract,
         address _nft,
         address _router,
-        address _srcAsset
+        address _srcAsset,
+        address _pricefeed
     ) external;
 
-    function start(
-        InputRule[] calldata _rules,
-        uint256 _duration,
-        uint256 _cap,
-        uint256 _initAmount,
-        uint256 _rewardRatio
-    ) external;
+    function start(InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external;
 
     function updateRule(InputRule calldata _inputRule) external;
 
@@ -114,7 +104,7 @@ interface IMoonPool {
 
     function input(uint256 _doublerId, SignatureParams memory datas) external;
 
-    function gain(uint256 _tokenId, SignatureParams memory datas) external;
+    function gain(uint256 _tokenId) external;
 
     function getFactory() external view returns (address);
 
@@ -124,5 +114,5 @@ interface IMoonPool {
 
     function ruleMap(address asset) external view returns (InputRule memory rule);
 
-    function tokenMuch() external view returns (uint256);
+    // function tokenMuch()external view returns(uint256);
 }
