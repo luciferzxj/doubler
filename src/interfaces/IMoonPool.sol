@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
-import './IOneInch.sol';
+// import './IOneInch.sol';
 
 interface IMoonPool {
     // map (pooId => Pool)
@@ -17,16 +17,16 @@ interface IMoonPool {
     // map (pooId => map(asset => InputRule))
     struct InputRule {
         address asset;
-        uint16 fallRatioMin;//100
-        uint16 fallRatioMax;//200
-        uint16 profitRatioMin;//50
-        uint16 profitRatioMax;//10000
+        uint16 fallRatioMin;
+        uint16 fallRatioMax;
+        uint16 profitRatioMin;
+        uint16 profitRatioMax;
         uint16 rewardRatioMin;
-        uint16 rewardRatioMax;//10000
+        uint16 rewardRatioMax;
         uint16 winnerRatioMin;
-        uint16 winnerRatioMax;//10000
-        uint256 tvl;//>0
-        uint256 layerInputMax;//>100
+        uint16 winnerRatioMax;
+        uint256 tvl;
+        uint256 layerInputMax;
     }
 
     // map(pooId => map(tokenId => Bill))
@@ -45,19 +45,13 @@ interface IMoonPool {
         address dbr;
         address dbrFarm;
         address FRNFT;
-        address oneInch;
-        address oneInchExcutor;
+        address aggregator;
+        address pricefeed;
     }
 
     struct SignatureParams {
-        uint256 amount;
-        uint256 minReturnAmount;
-        uint256 falgs;
-        uint256 deadline;
-        bytes32 mask;
-        bytes data;
-        bytes signature;
-        bytes inData;
+        uint256 amountOut;
+        uint256 maxAmountIn;
     }
 
     event NewPool(address creator, address lp);
@@ -77,7 +71,12 @@ interface IMoonPool {
         uint256 layerInputMax
     );
 
-    event Withdraw(address buyer, uint256 lpAmount, uint256 uAmount, uint256 dbrAmount);
+    event Withdraw(
+        address buyer,
+        uint256 lpAmount,
+        uint256 uAmount,
+        uint256 dbrAmount
+    );
     event NewInput(
         uint256 indexed doublerId,
         uint256 lastLayer,
@@ -87,7 +86,6 @@ interface IMoonPool {
     );
     event Gain(uint256 tokenIds, uint256 spend, uint256 uSell, uint256 mintDbr);
 
-    // function newPool(AddPool calldata _addPool) external;
     function initialize(
         address _creator,
         address _dev,
@@ -95,12 +93,18 @@ interface IMoonPool {
         address _doublerContract,
         address _dbrFarmContract,
         address _nft,
-        address _aggragator,
-        address _excutor,
-        address _srcAsset
+        address _router,
+        address _srcAsset,
+        address _pricefeed
     ) external;
 
-    function start(InputRule[] calldata _rules, uint256 _duration, uint256 _cap, uint256 _initAmount) external;
+    function start(
+        InputRule[] calldata _rules,
+        uint256 _duration,
+        uint256 _cap,
+        uint256 _initAmount,
+        uint256 _rewardRatio
+    ) external;
 
     function updateRule(InputRule calldata _inputRule) external;
 
@@ -110,14 +114,17 @@ interface IMoonPool {
 
     function input(uint256 _doublerId, SignatureParams memory datas) external;
 
-    function gain(uint256 _tokenId, SignatureParams memory datas) external;
+    function gain(uint256 _tokenId) external;
 
     function getFactory() external view returns (address);
 
-    function inputRecord(uint256 tokenId) external view returns (InputRecord memory record);
+    function inputRecord(
+        uint256 tokenId
+    ) external view returns (InputRecord memory record);
 
     function poolInfo() external view returns (Pool memory pool);
 
-    function ruleMap(address asset) external view returns (InputRule memory rule);
-    function tokenMuch()external view returns(uint256);
+    function ruleMap(
+        address asset
+    ) external view returns (InputRule memory rule);
 }

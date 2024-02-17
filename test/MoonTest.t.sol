@@ -1,458 +1,665 @@
 pragma solidity ^0.8.12;
-import 'forge-std/Test.sol';
+import "forge-std/Test.sol";
 // import 'forge-std/StdCheats.sol';
-import 'forge-std/console.sol';
-import '../src/MoonPool.sol';
+import "forge-std/console.sol";
+import "../src/MoonPool.sol";
 // import '../src/Doubler.sol';
-import '../src/FRNFT.sol';
-import '../src/LP.sol';
-import '../src/MoonPoolFactory.sol';
-import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
-contract MoonTest is Test{
-    //网络rpc
-    string constant OP_TEST= 'https://opt-sepolia.g.alchemy.com/v2/vdFQmXEt1j8hW791DhizA5NdMlTQlAxC';
-    string private OPT_RPC = 'https://opt-mainnet.g.alchemy.com/v2/jTyU-Rhb3RrfCDBAI2H1Jr6sgAeH0Fal';
-    //EOA地址
-    address signer = 0x56865ed38a0e9B4C517F1612057A90E6143FBD87;
-    address developer = makeAddr('developer');
-    address owner = makeAddr('owner');
-    address user1 = makeAddr('user1');
-    //代币地址
-    address USDC = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;//6
-    address DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
-    address USDT = 0x94b008aA00579c1307B0EF2c499aD98a8ce58e58;//6
-    address OP = 0x4200000000000000000000000000000000000042;
-    address STG = 0x296F55F8Fb28E498B858d0BcDA06D955B2Cb3f97;
+import "../src/FRNFT.sol";
+// import '../src/LP.sol';
+import "../src/interfaces/IUniswapV3Factory.sol";
+import "../src/interfaces/IUniswapV3Pool.sol";
+import "../src/interfaces/IUniswapV3SwapRouter.sol";
+import "../src/SwapAggregator.sol";
+import "../src/MoonPoolFactory.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+// import '../src/uniswapV3/libraries/LiquidityAmounts.sol';
+// import '../src/uniswapV3/libraries/TickMath.sol';
+import "../src/test/FastPriceFeedTest.sol";
+import "../src/test/UniswapRouterV2V3.sol";
+contract MoonTest is Test {
+    //rpc
+    string private OPT_RPC =
+        "https://opt-mainnet.g.alchemy.com/v2/jTyU-Rhb3RrfCDBAI2H1Jr6sgAeH0Fal";
+    //EOA
+    address developer = makeAddr("developer");
+    address owner = makeAddr("owner");
+    address user1 = makeAddr("user1");
+    //token
+    //mock
+    address USDC = address(new Token("USDC", "USDC")); //6
+    address USDT = address(new Token("USDT", "USDT"));
+    address DAI = address(new Token("DAI", "DAI")); //6
+    address OP = address(new Token("OP", "OP"));
     address constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    address constant WETH = 0x4200000000000000000000000000000000000006;
-    //合约
-    IOneInch aggregator = IOneInch(0x1111111254EEB25477B68fb85Ed929f73A960582);
-    address executor = 0xB63AaE6C353636d66Df13b89Ba4425cfE13d10bA;
+    address WETH = address(new WETH9("WETH", "WETH"));
+    //op
+    // address USDC = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;//6
+    // address DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
+    // address USDT = 0x94b008aA00579c1307B0EF2c499aD98a8ce58e58;//6
+    // address OP = 0x4200000000000000000000000000000000000042;
+    // address constant WETH = 0x4200000000000000000000000000000000000006;
+    Aggregator aggregator;
     Factory factory;
     address dbrFarm;
     Doubler doubler;
     Token dbr;
     FRNFT fr;
     IMoonPool moon;
-    function setUp()public{
-        //环境构造
-        vm.createSelectFork(OPT_RPC);
-        // deal(USDC,owner,100000 * 10**6);
-        deal(USDT,owner,100000 * 10**6);
-        deal(USDT,user1,100000 * 10**6);
-        deal(DAI,owner,100000 ether);
-        deal(DAI,user1,100000 ether);
-        // assertEq(IERC20(USDT).balanceOf(owner),100000*10**6);
-        // assertEq(IERC20(DAI).balanceOf(owner),100000 ether);
-        // initializeMoon();
-    }   
+    //op
+    // ISwapRouter uniV3Router = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    //mock
+    UniV2Router uniV2Router;
+    swapRouter uniV3Router;
+    FastPriceFeedTest priceFeed;
+    function setUp() public {
+        //op
+        // vm.createSelectFork(OPT_RPC);
+        // deal(USDT,owner,100000 * 10**6);
+        // deal(USDT,user1,100000 * 10**6);
+        // deal(DAI,owner,100000 ether);
+        // deal(DAI,user1,100000 ether);
+        //mock
+        Token(USDT).mint(200000 * 10 ** 6);
+        Token(USDT).transfer(owner, 100000 * 10 ** 6);
+        Token(USDT).transfer(user1, 100000 * 10 ** 6);
+        Token(DAI).mint(200000 ether);
+        Token(DAI).transfer(owner, 100000 ether);
+        Token(DAI).transfer(user1, 100000 ether);
+        deployUni();
+        initPriceFeed();
+    }
+    function initPriceFeed() internal {
+        priceFeed = new FastPriceFeedTest();
+        priceFeed.initialize();
+        priceFeed.setAssetPrice(USDT, 1, 6);
+        priceFeed.setAssetPrice(USDC, 1, 6);
+        priceFeed.setAssetPrice(DAI, 1, 18);
+        priceFeed.setAssetPrice(WETH, 2000, 8);
+        priceFeed.setAssetPrice(OP, 4, 18);
+    }
+    function deployUni() internal {
+        //deploy V2
+        uniV2Router = new UniV2Router();
+        createV2Pair();
+        //deploy V3
+        uniV3Router = new swapRouter();
+        createV3Pair();
+    }
+    function createV2Pair() internal {
+        Token(USDT).mint(4000000 * 10 ** 6);
+        Token(DAI).mint(3000000 ether);
+        Token(USDC).mint(2000000 * 10 ** 6);
+        Token(OP).mint(500000 ether);
+        Token(WETH).mint(500 * 10 ** 8);
+        address pair = uniV2Router.createPair(DAI, USDT);
+        IERC20(DAI).transfer(pair, 1000000 ether);
+        IERC20(USDT).transfer(pair, 1000000 * 10 ** 6);
+        UniswapV2Pair(pair).sync();
+        pair = uniV2Router.createPair(DAI, USDC);
+        IERC20(DAI).transfer(pair, 1000000 ether);
+        IERC20(USDC).transfer(pair, 1000000 * 10 ** 6);
+        UniswapV2Pair(pair).sync();
+        pair = uniV2Router.createPair(DAI, OP);
+        IERC20(DAI).transfer(pair, 1000000 ether);
+        IERC20(OP).transfer(pair, 250000 ether);
+        UniswapV2Pair(pair).sync();
+        pair = uniV2Router.createPair(USDC, USDT);
+        IERC20(USDC).transfer(pair, 1000000 * 10 ** 6);
+        IERC20(USDT).transfer(pair, 1000000 * 10 ** 6);
+        UniswapV2Pair(pair).sync();
+        pair = uniV2Router.createPair(OP, USDT);
+        IERC20(OP).transfer(pair, 250000 ether);
+        IERC20(USDT).transfer(pair, 1000000 * 10 ** 6);
+        UniswapV2Pair(pair).sync();
+        pair = uniV2Router.createPair(WETH, USDT);
+        IERC20(WETH).transfer(pair, 500 * 10 ** 8);
+        IERC20(USDT).transfer(pair, 1000000 * 10 ** 6);
+        UniswapV2Pair(pair).sync();
+    }
 
+    function createV3Pair() internal {
+        Token(USDT).mint(400000 * 10 ** 6);
+        Token(DAI).mint(300000 ether);
+        Token(USDC).mint(200000 * 10 ** 6);
+        Token(OP).mint(50000 ether);
+        Token(WETH).mint(50 * 10 ** 8);
+        address pair = uniV3Router.createPair(DAI, USDT);
+        IERC20(DAI).transfer(pair, 100000 ether);
+        IERC20(USDT).transfer(pair, 100000 * 10 ** 6);
+        UniswapV3Pair(pair).sync();
+        pair = uniV3Router.createPair(DAI, USDC);
+        IERC20(DAI).transfer(pair, 100000 ether);
+        IERC20(USDC).transfer(pair, 100000 * 10 ** 6);
+        UniswapV3Pair(pair).sync();
+        pair = uniV3Router.createPair(DAI, OP);
+        IERC20(DAI).transfer(pair, 100000 ether);
+        IERC20(OP).transfer(pair, 25000 ether);
+        UniswapV3Pair(pair).sync();
+        pair = uniV3Router.createPair(USDC, USDT);
+        IERC20(USDC).transfer(pair, 100000 * 10 ** 6);
+        IERC20(USDT).transfer(pair, 100000 * 10 ** 6);
+        UniswapV3Pair(pair).sync();
+        pair = uniV3Router.createPair(OP, USDT);
+        IERC20(OP).transfer(pair, 25000 ether);
+        IERC20(USDT).transfer(pair, 100000 * 10 ** 6);
+        UniswapV3Pair(pair).sync();
+        pair = uniV3Router.createPair(WETH, USDT);
+        IERC20(WETH).transfer(pair, 50 * 10 ** 8);
+        IERC20(USDT).transfer(pair, 100000 * 10 ** 6);
+        UniswapV3Pair(pair).sync();
+    }
 
-    // function initializeMoon()internal{
-    //     vm.startPrank(owner);
-    //     factory.createMoonPool(DAI);
-    //     moon = IMoonPool(factory.moonPools()[0]);
-    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](2);
-    //     rules[0] = IMoonPool.InputRule(ETH,100,200,50,10000,50,10000,50,10000,5,200);
-    //     rules[1] = IMoonPool.InputRule(WETH,110,190,100,5000,50,10000,200,9000,10,300);
-    //     IERC20(DAI).approve(address(moon),100000 ether);
-    //     // console.log(IERC20(DAI).balanceOf(owner));
-    //     moon.start(rules,60 days,1000000 ether,100000 ether);
-    //     vm.stopPrank();
-    // }
-    function testCreateFactory()public{
+    function uniswapV3MintCallback(
+        uint256 amount0Owed,
+        uint256 amount1Owed,
+        bytes calldata data
+    ) external {
+        (address token1, address token2) = abi.decode(data, (address, address));
+        Token(token1).mint(amount0Owed);
+        IERC20(token1).transfer(msg.sender, amount0Owed);
+        Token(token2).mint(amount1Owed);
+        IERC20(token2).transfer(msg.sender, amount1Owed);
+    }
+    function testCreateFactory() public {
         vm.startPrank(owner);
-        //合约创建
-        address[] memory tokens = new address[](7);
-        tokens[0]=USDC;
-        tokens[1]=DAI;
-        tokens[2]=USDT;
-        tokens[3]=OP;
-        tokens[4]=ETH;
-        tokens[5]=WETH;
-        tokens[6]=STG;
+
+        address[] memory tokens = new address[](6);
+        tokens[0] = USDC;
+        tokens[1] = DAI;
+        tokens[2] = USDT;
+        tokens[3] = OP;
+        tokens[4] = ETH;
+        tokens[5] = WETH;
         doubler = new Doubler(tokens);
-        // deal(DAI,address(doubler),10000 ether);
-        // deal(USDT,address(doubler),10000 ether);
-        fr = new FRNFT('FRNFT','FR');
+        fr = new FRNFT("FRNFT", "FR");
         doubler.setNft(address(fr));
-        dbr = new Token('DBR','D');
+        dbr = new Token("DBR", "D");
         dbrFarm = address(new DbrFarm(address(dbr)));
-        fr.initialize(address(doubler),owner);
+        Aggregator.RouterConfig memory temp;
+        temp.uniswapV3Router = address(uniV3Router);
+        temp.uniswapV2Router = address(uniV2Router);
+        aggregator = new Aggregator(temp);
+        fr.initialize(address(doubler), owner);
         Factory.MoonPoolBaseConfig memory cfg;
         cfg.dev = developer;
-        cfg.signer = signer;
         cfg.doubler = address(doubler);
         cfg.dbr = address(dbr);
         cfg.dbrFarm = dbrFarm;
         cfg.nft = address(fr);
-        cfg.oneInchAggregator = address(aggregator);
-        cfg.oneInchExecutor = executor;
-        factory = new Factory(cfg,DAI,USDC,USDT);
+        cfg.aggregator = address(aggregator);
+        cfg.pricefeed = address(priceFeed);
+        factory = new Factory(cfg, DAI, USDC, USDT);
+        setStrategy();
         vm.stopPrank();
     }
+    function setStrategy() internal {
+        Aggregator.UniV3Data memory data;
+        Aggregator.UniV2Data memory data2;
+        //OP
+        //DAI-USDT
+        // data.path = abi.encodePacked(USDT,uint24(100),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(DAI, USDT, data);
+
+        // data.path = abi.encodePacked(USDT,uint24(100),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDT, DAI, data);
+
+        // //DAI-USDC
+        // data.path = abi.encodePacked(USDC,uint24(100),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(DAI, USDC, data);
+
+        // data.path = abi.encodePacked(USDC,uint24(100),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDC, DAI, data);
+        // //DAI-OP
+        // data.path = abi.encodePacked(OP,uint24(10000),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(DAI, OP, data);
+
+        // data.path = abi.encodePacked(OP,uint24(10000),DAI);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(OP, DAI, data);
+        // //USDT-USDC
+        // data.path = abi.encodePacked(USDC,uint24(100),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDT, USDC, data);
+
+        // data.path = abi.encodePacked(USDC,uint24(100),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDC, USDT, data);
+        // //USDT-OP
+        // data.path = abi.encodePacked(OP,uint24(3000),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDT, OP, data);
+
+        // data.path = abi.encodePacked(OP,uint24(3000),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(OP, USDT, data);
+        // //USDT-WETH
+        // data.path = abi.encodePacked(WETH,uint24(500),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(USDT, WETH, data);
+
+        // data.path = abi.encodePacked(WETH,uint24(500),USDT);
+        // data.ratio = 10000;
+        // aggregator.addUniV3Strategy(WETH, USDT, data);
+        //本地mock
+        //DAI-USDT
+        data.path = abi.encode(USDT, uint24(100), DAI);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(DAI, USDT, data);
+
+        data.path = abi.encode(USDT, uint24(100), USDC, uint24(100), DAI);
+        data.ratio = 2000;
+        aggregator.addUniV3Strategy(DAI, USDT, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = DAI;
+        data2.path[1] = USDT;
+        data2.ratio = 3000;
+        aggregator.addUniV2Strategy(DAI, USDT, data2);
+        //USDT-DAI
+        data.path = abi.encode(USDT, uint24(100), DAI);
+        data.ratio = 4000;
+        aggregator.addUniV3Strategy(USDT, DAI, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDT;
+        data2.path[1] = DAI;
+        data2.ratio = 4000;
+        aggregator.addUniV2Strategy(USDT, DAI, data2);
+
+        data2.path = new address[](3);
+        data2.path[0] = USDT;
+        data2.path[1] = USDC;
+        data2.path[2] = DAI;
+        data2.ratio = 2000;
+        aggregator.addUniV2Strategy(USDT, DAI, data2);
+
+        //DAI-USDC
+        data.path = abi.encode(USDC, uint24(100), DAI);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(DAI, USDC, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = DAI;
+        data2.path[1] = USDC;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(DAI, USDC, data2);
+        //USDC-DAI
+        data.path = abi.encode(USDC, uint24(100), DAI);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(USDC, DAI, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDC;
+        data2.path[1] = DAI;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(USDC, DAI, data2);
+        //DAI-OP
+        data.path = abi.encode(OP, uint24(10000), DAI);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(DAI, OP, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = DAI;
+        data2.path[1] = OP;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(DAI, OP, data2);
+        //OP-DAI
+        data.path = abi.encode(OP, uint24(10000), DAI);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(OP, DAI, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = OP;
+        data2.path[1] = DAI;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(OP, DAI, data2);
+        //USDT-USDC
+        data.path = abi.encode(USDC, uint24(100), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(USDT, USDC, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDT;
+        data2.path[1] = USDC;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(USDT, USDC, data2);
+        //USDC-USDT
+        data.path = abi.encode(USDC, uint24(100), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(USDC, USDT, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDC;
+        data2.path[1] = USDT;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(USDC, USDT, data2);
+        //USDT-OP
+        data.path = abi.encode(OP, uint24(3000), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(USDT, OP, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDT;
+        data2.path[1] = OP;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(USDT, OP, data2);
+        //OP-USDT
+        data.path = abi.encode(OP, uint24(3000), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(OP, USDT, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = OP;
+        data2.path[1] = USDT;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(OP, USDT, data2);
+        //USDT-WETH
+        data.path = abi.encode(WETH, uint24(500), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(USDT, WETH, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = USDT;
+        data2.path[1] = WETH;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(USDT, WETH, data2);
+        //WETH-USDT
+        data.path = abi.encode(WETH, uint24(500), USDT);
+        data.ratio = 5000;
+        aggregator.addUniV3Strategy(WETH, USDT, data);
+
+        data2.path = new address[](2);
+        data2.path[0] = WETH;
+        data2.path[1] = USDT;
+        data2.ratio = 5000;
+        aggregator.addUniV2Strategy(WETH, USDT, data2);
+    }
     //DAI池
-    function testDaiCreatePool()public{
+    function testDaiCreatePool() public {
         testCreateFactory();
         vm.startPrank(owner);
-        // vm.startPrank(owner);
         doubler.createDoubler(USDT);
         doubler.createDoubler(USDC);
         doubler.createDoubler(OP);
         IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
-        rules[0] = IMoonPool.InputRule(USDT,100,200,50,10000,50,10000,50,10000,5,200);
-        rules[1] = IMoonPool.InputRule(USDC,110,190,100,5000,50,10000,200,9000,10,300);
-        rules[2] = IMoonPool.InputRule(OP,100,200,50,10000,50,10000,50,10000,5,200);
-        deal(USDT,address(doubler),10000*10**6);
-        // deal(USDC,address(doubler),10000 ether);
-        deal(OP,address(doubler),10000 ether);
-        IERC20(DAI).approve(address(factory),100000 ether);
-        // console.log(IERC20(DAI).balanceOf(owner));
-        // moon.start(rules,60 days,1000000 ether,100000 ether);
-        factory.createMoonPool(DAI,rules,60 days,1000000 ether,100000 ether);
-        assertEq(factory.moonPools().length,1);
+        rules[0] = IMoonPool.InputRule(
+            USDT,
+            100,
+            200,
+            50,
+            10000,
+            50,
+            10000,
+            50,
+            10000,
+            5,
+            200
+        );
+        rules[1] = IMoonPool.InputRule(
+            USDC,
+            110,
+            190,
+            100,
+            5000,
+            50,
+            10000,
+            200,
+            9000,
+            10,
+            300
+        );
+        rules[2] = IMoonPool.InputRule(
+            OP,
+            100,
+            200,
+            50,
+            10000,
+            50,
+            10000,
+            50,
+            10000,
+            5,
+            200
+        );
+        deal(USDC, address(doubler), 1000 * 10 ** 6);
+        deal(USDT, address(doubler), 1000 * 10 ** 6);
+        deal(OP, address(doubler), 100 ether);
+        IERC20(DAI).approve(address(factory), 100000 ether);
+        factory.createMoonPool(
+            DAI,
+            rules,
+            60 days,
+            1000000 ether,
+            100000 ether,
+            1000
+        );
+        assertEq(factory.moonPools().length, 1);
         moon = IMoonPool(factory.moonPools()[0]);
-        assertEq(IERC20(address(moon)).balanceOf(owner),102000 ether);
-        // assertEq(factory.moonPools().length,1);
-        // moon = IMoonPool(factory.moonPools()[0]);
+        assertEq(IERC20(address(moon)).balanceOf(owner), 102000 ether);
         vm.stopPrank();
     }
 
-    // function testDaiStart()public{
-    //     testDaiCreatePool();
-    //     vm.startPrank(owner);
-    //     doubler.createDoubler(USDT);
-    //     doubler.createDoubler(USDC);
-    //     doubler.createDoubler(OP);
-    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
-    //     rules[0] = IMoonPool.InputRule(USDT,100,200,50,10000,50,10000,50,10000,5,200);
-    //     rules[1] = IMoonPool.InputRule(USDC,110,190,100,5000,50,10000,200,9000,10,300);
-    //     rules[2] = IMoonPool.InputRule(OP,100,200,50,10000,50,10000,50,10000,5,200);
-    //     IERC20(DAI).approve(address(moon),100000 ether);
-    //     // console.log(IERC20(DAI).balanceOf(owner));
-    //     moon.start(rules,60 days,1000000 ether,100000 ether);
-    //     assertEq(IERC20(address(moon)).balanceOf(owner),102000 ether);
-    //     vm.stopPrank();
-    // }
-
-    function testDaiDeposit()public{
+    function testDaiDeposit() public {
         testDaiCreatePool();
-        // testCreatePool();
         vm.startPrank(user1);
-        IERC20(DAI).approve(address(moon),100000 ether);
+        IERC20(DAI).approve(address(moon), 100000 ether);
         moon.deposite(100000 ether);
-        assertEq(IERC20(address(moon)).balanceOf(user1),104040 ether);
-        // console.log(IERC20(DAI).balanceOf(user1));
+        assertEq(IERC20(address(moon)).balanceOf(user1), 104040 ether);
         vm.stopPrank();
     }
 
-    function testDaiWithdraw()public{
+    function testDaiWithdraw() public {
         testDaiDeposit();
         vm.startPrank(user1);
         moon.withdraw(104040 ether);
-        assertEq(IERC20(address(moon)).totalSupply(),102000 ether);
-        assertEq(IERC20(address(DAI)).balanceOf(user1)/1 ether,98970);
+        assertEq(IERC20(address(moon)).totalSupply(), 102000 ether);
+        assertEq(IERC20(address(DAI)).balanceOf(user1) / 1 ether, 98970);
         vm.stopPrank();
     }
-    struct SignatureParams {
-        uint256 amount;
-        uint256 minReturnAmount;
-        uint256 falgs;
-        uint256 deadline;
-        bytes32 mask;
-        bytes data;
-        bytes signature;
-    }
-    function testInputDAI1()public{
+    function testInputDAI1() public {
         testDaiDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'00000000000000000000000000000000000000000000000000000000006300a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d9000000000000000000000100da10009cbd5d07dd0cecc66161fc93d7c9000da194b008aa00579c1307b0ef2c499ad98a8ce58e581111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000 ether;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'866ea4468e6b3988aa24eb17948b8b9b557660213d753dfc9b79ce06640e8a8f751a97e6038c501de3f7404957adfb83a646d6190e3085b812ab9e4abb60dd471c';
-        para.inData = hex'0000000000000000000000000000000000000000000000f80000ca0000b051201337bedc9d22ecbe766df105c9623922a27963ec94b008aa00579c1307b0ef2c499ad98a8ce58e5800443df02124000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000486fe4195394e4c9f7e0020d6bdbf78da10009cbd5d07dd0cecc66161fc93d7c9000da180a06c4eca27da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582';
-        moon.input(0,para);
-        assertEq(moon.poolInfo().pendingValue,100000 ether);
-        assertGt(moon.tokenMuch(),0);
+        para.amountOut = 10000 * 10 ** 6;
+        para.maxAmountIn = 11000 ether;
+        moon.input(0, para);
+        assertGt(moon.poolInfo().pendingValue, 10000 ether);
         vm.stopPrank();
     }
 
-    function testInputDAI2()public{
+    function testInputDAI2() public {
         testDaiDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'00000000000000000000000000000000000000000000000000000000006300a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d9000000000000000000000100da10009cbd5d07dd0cecc66161fc93d7c9000da10b2c639c533813f4aa9d7837caf62653d097ff851111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000 ether;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'2343f652aef8e6bbc25015100a482266ee43a45f1d540510b49095e1cfc21f7e41d47ee2de6b7c2b1597268e7828859a55e3ae4083585415306a2e2ec6b75eed1c';
-        para.inData = hex"00000000000000000000000000000000000000000000000000000000006300a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d90000000000000000000001000b2C639c533813f4Aa9D7837CAf62653d097Ff85da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582";
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.input(1,para);
-        assertEq(moon.poolInfo().pendingValue,100000 ether);
-        assertGt(moon.tokenMuch(),0);
+        para.amountOut = 10000 * 10 ** 6;
+        para.maxAmountIn = 11000 ether;
+        moon.input(1, para);
+        assertGt(moon.poolInfo().pendingValue, 10000 ether);
         vm.stopPrank();
     }
-    function testInputDAI3()public{
+    function testInputDAI3() public {
         testDaiDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000000000000001505126a132dab612db5cb9fc9ac426a0cc215a3423f9c9da10009cbd5d07dd0cecc66161fc93d7c9000da10004f41766d80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000092e0404dc7ab93300000000000000000000000000000000000000000000000000000000000000a00000000000000000000000001111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000066c1f0050000000000000000000000000000000000000000000000000000000000000001000000000000000000000000da10009cbd5d07dd0cecc66161fc93d7c9000da100000000000000000000000042000000000000000000000000000000000000420000000000000000000000000000000000000000000000000000000000000000';
-        para.amount = 100000 ether;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'de87ebca5f5221952b82d7e2714ffe3f7db44582b273431976abfe02c0e76bdd2955da284066100a1c2c34e2f708adadb8efd086c932b4a0adf6d0badfd7611c1b';
-        para.inData = hex"0000000000000000000000000000000000000000000001b500018700013d00a007e5c0d20000000000000000000000000000000000000000000001190000ff00004f02a00000000000000000000000000000000000000000000000000000000000e9f8dfee63c1e5011d751bc1a723accf1942122ca9aa82d49d08d2ae420000000000000000000000000000000000004251201337bedc9d22ecbe766df105c9623922a27963ec7f5c764cbc14f9669b88837ca1490cca17c3160700443df02124000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d478ef83654a7ad00020d6bdbf78da10009cbd5d07dd0cecc66161fc93d7c9000da100a0f2fa6b66da10009cbd5d07dd0cecc66161fc93d7c9000da1000000000000000000000000000000000000000000000000d8cefed9ab46c6770000000000000000453d756a9a75350b80a06c4eca27da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582";
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.input(2,para);
-        assertEq(moon.poolInfo().pendingValue,100000 ether);
-        assertGt(moon.tokenMuch(),0);
+        para.amountOut = 1000 ether;
+        para.maxAmountIn = 4400 ether;
+        moon.input(2, para);
+        assertGt(moon.poolInfo().pendingValue, 4000 ether);
         vm.stopPrank();
     }
 
-    function testGainDai1()public{
+    function testGainDAI1() public {
         testInputDAI1();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000f80000ca0000b051201337bedc9d22ecbe766df105c9623922a27963ec94b008aa00579c1307b0ef2c499ad98a8ce58e5800443df0212400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c9f7e0020d6bdbf78da10009cbd5d07dd0cecc66161fc93d7c9000da180a06c4eca27da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;      
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'39859eb728cc3311e8a99ffedd55433084b255751a124116ff4aa2fc59c394f850aacd79054c87eff6af083a36816fbdf45ff9487d2b302a603c894947695c481b';
-        // para.inData = hex'00000000000000000000000000000000000000000000000000000000006300a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d9000000000000000000000100da10009cbd5d07dd0cecc66161fc93d7c9000da194b008aa00579c1307b0ef2c499ad98a8ce58e581111111254eeb25477b68fb85ed929f73a960582';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertGt(IERC20(DAI).balanceOf(owner),90 ether);
         vm.stopPrank();
     }
-    function testGainDai2()public{
+    function testGainDAI2() public {
         testInputDAI2();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'00000000000000000000000000000000000000000000000000000000006300a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d90000000000000000000001000b2C639c533813f4Aa9D7837CAf62653d097Ff85da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'8fd44582fd64b9b28a6338e7f68b2dbc980f37e707ff170764446607d91c6e043c741b653aec57596129e3d330aaf83604296d2fbf76befece0dbcd668180ba51b';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertGt(IERC20(DAI).balanceOf(owner),90 ether);
         vm.stopPrank();
     }
-    function testGainDai3()public{
+    function testGainDAI3() public {
         testInputDAI3();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000001b500018700013d00a007e5c0d20000000000000000000000000000000000000000000001190000ff00004f02a00000000000000000000000000000000000000000000000000000000000e9f8dfee63c1e5011d751bc1a723accf1942122ca9aa82d49d08d2ae420000000000000000000000000000000000004251201337bedc9d22ecbe766df105c9623922a27963ec7f5c764cbc14f9669b88837ca1490cca17c3160700443df02124000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d478ef83654a7ad00020d6bdbf78da10009cbd5d07dd0cecc66161fc93d7c9000da100a0f2fa6b66da10009cbd5d07dd0cecc66161fc93d7c9000da1000000000000000000000000000000000000000000000000d8cefed9ab46c6770000000000000000453d756a9a75350b80a06c4eca27da10009cbd5d07dd0cecc66161fc93d7c9000da11111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'c0fde45092595c84b826a8af50a6ec3bc8f844304fa897ad5e534a6dc4488eaf0b992ff320ac7ea6b275bc871c41bfabaaf0e32354384b64ce7062dcb9719a6a1b';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(DAI).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertGt(IERC20(DAI).balanceOf(owner),35 ether);
         vm.stopPrank();
     }
 
-
-    //USDT池
-    function testUSDTCreatePool()public{
+    //USDT
+    function testUSDTCreatePool() public {
         testCreateFactory();
         vm.startPrank(owner);
-        doubler.createDoubler(STG);
+        doubler.createDoubler(USDC);
         doubler.createDoubler(OP);
         doubler.createDoubler(WETH);
         IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
-        rules[0] = IMoonPool.InputRule(STG,100,200,50,10000,50,10000,50,10000,5,200);
-        rules[1] = IMoonPool.InputRule(OP,110,190,100,5000,50,10000,200,9000,10,300);
-        rules[2] = IMoonPool.InputRule(WETH,100,200,50,10000,50,10000,50,10000,5,200);
-        deal(STG,address(doubler),10000 ether);
-        deal(WETH,address(doubler),10000 ether);
-        deal(OP,address(doubler),10000 ether);
-        IERC20(USDT).approve(address(factory),100000*10**6);
-        factory.createMoonPool(USDT,rules,60 days,1000000*10**6,100000*10**6);
-        assertEq(factory.moonPools().length,1);
+        rules[0] = IMoonPool.InputRule(
+            USDC,
+            100,
+            200,
+            50,
+            10000,
+            50,
+            10000,
+            50,
+            10000,
+            5,
+            200
+        );
+        rules[1] = IMoonPool.InputRule(
+            OP,
+            110,
+            190,
+            100,
+            5000,
+            50,
+            10000,
+            200,
+            9000,
+            10,
+            300
+        );
+        rules[2] = IMoonPool.InputRule(
+            WETH,
+            100,
+            200,
+            50,
+            10000,
+            50,
+            10000,
+            50,
+            10000,
+            5,
+            200
+        );
+        deal(WETH, address(doubler), 1 * 10 ** 8);
+        deal(OP, address(doubler), 100 ether);
+        IERC20(USDT).approve(address(factory), 100000 * 10 ** 6);
+        factory.createMoonPool(
+            USDT,
+            rules,
+            60 days,
+            1000000 * 10 ** 6,
+            100000 * 10 ** 6,
+            1000
+        );
+        assertEq(factory.moonPools().length, 1);
         moon = IMoonPool(factory.moonPools()[0]);
-        assertEq(IERC20(address(moon)).balanceOf(owner),102000*10**6);
+        assertEq(IERC20(address(moon)).balanceOf(owner), 102000 * 10 ** 6);
         vm.stopPrank();
     }
 
-    // function testUSDTStart()public{
-    //     testUSDTCreatePool();
-    //     vm.startPrank(owner);
-    //     doubler.createDoubler(STG);
-    //     doubler.createDoubler(OP);
-    //     doubler.createDoubler(WETH);
-    //     IMoonPool.InputRule[] memory rules = new IMoonPool.InputRule[](3);
-    //     rules[0] = IMoonPool.InputRule(STG,100,200,50,10000,50,10000,50,10000,5,200);
-    //     rules[1] = IMoonPool.InputRule(OP,110,190,100,5000,50,10000,200,9000,10,300);
-    //     rules[2] = IMoonPool.InputRule(WETH,100,200,50,10000,50,10000,50,10000,5,200);
-    //     IERC20(USDT).approve(address(moon),100000*10**6);
-    //     // console.log(IERC20(DAI).balanceOf(owner));
-    //     moon.start(rules,60 days,1000000*10**6,100000*10**6);
-    //     assertEq(IERC20(address(moon)).balanceOf(owner),102000*10**6);
-    //     vm.stopPrank();
-    // }
-
-    function testUSDTDeposit()public{
+    function testUSDTDeposit() public {
         testUSDTCreatePool();
-        // testCreatePool();
         vm.startPrank(user1);
-        IERC20(USDT).approve(address(moon),100000 *10**6);
-        moon.deposite(100000 *10**6);
-        assertEq(IERC20(address(moon)).balanceOf(user1),104040 *10**6);
-        // console.log(IERC20(DAI).balanceOf(user1));
+        IERC20(USDT).approve(address(moon), 100000 * 10 ** 6);
+        moon.deposite(100000 * 10 ** 6);
+        assertEq(IERC20(address(moon)).balanceOf(user1), 104040 * 10 ** 6);
         vm.stopPrank();
     }
 
-    function testUSDTWithdraw()public{
+    function testUSDTWithdraw() public {
         testUSDTDeposit();
         vm.startPrank(user1);
-        moon.withdraw(104040 *10**6);
-        assertEq(IERC20(address(moon)).totalSupply(),102000 *10**6);
-        assertEq(IERC20(address(USDT)).balanceOf(user1)/10**6,98970);
+        moon.withdraw(104040 * 10 ** 6);
+        assertEq(IERC20(address(moon)).totalSupply(), 102000 * 10 ** 6);
+        assertEq(IERC20(address(USDT)).balanceOf(user1) / 10 ** 6, 98970);
         vm.stopPrank();
     }
 
-    function testInputUSDT1()public{
+    function testInputUSDT1() public {
         testUSDTDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000000000000001e300a007e5c0d20000000000000000000000000000000000000000000000000001bf00004f00a0fbb7cd06009da11ff60bfc5af527f58fd61679c3ac98d040d900000000000000000000010094b008aa00579c1307b0ef2c499ad98a8ce58e587f5c764cbc14f9669b88837ca1490cca17c316075126a062ae8a9c5e11aaa026fc2670b0d65ccc8b28587f5c764cbc14f9669b88837ca1490cca17c316070004cac88ea9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0c764b556a2dc82900000000000000000000000000000000000000000000000000000000000000a00000000000000000000000001111111254eeb25477b68fb85ed929f73a9605820000000000000000000000000000000000000000000000000000000066c340ae00000000000000000000000000000000000000000000000000000000000000010000000000000000000000007f5c764cbc14f9669b88837ca1490cca17c31607000000000000000000000000296f55f8fb28e498b858d0bcda06d955b2cb3f970000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f1046053aa5682b4f9a81b5481394da16be5ff5a';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'4d9a7ff13d4c6a6ce70212d5e264592028f27baecfe29e6e9345bb2b07b468be2fa51a05ba847febc8863b59ad053834f2cdabd150666f08dddbdc6b0190c7191c';
-        para.inData = hex"0000000000000000000000000000000000000000000000000000000001f700a007e5c0d20000000000000000000000000000000000000000000000000001d30001705126a062ae8a9c5e11aaa026fc2670b0d65ccc8b2858296f55f8fb28e498b858d0bcda06d955b2cb3f970004cac88ea90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000184812900000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000b63aae6c353636d66df13b89ba4425cfe13d10ba0000000000000000000000000000000000000000000000000000000066c2f0040000000000000000000000000000000000000000000000000000000000000001000000000000000000000000296f55f8fb28e498b858d0bcda06d955b2cb3f970000000000000000000000007f5c764cbc14f9669b88837ca1490cca17c316070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f1046053aa5682b4f9a81b5481394da16be5ff5a00a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d90000000000000000000001007f5c764cbc14f9669b88837ca1490cca17c3160794b008aa00579c1307b0ef2c499ad98a8ce58e581111111254eeb25477b68fb85ed929f73a960582";
-        moon.input(0,para);
-        assertEq(moon.poolInfo().pendingValue,100000*10**6);
-        assertGt(moon.tokenMuch(),0);
-        console.log(moon.tokenMuch());
+        para.amountOut = 10000 * 10 ** 6;
+        para.maxAmountIn = 11000 * 10 ** 6;
+        moon.input(0, para);
+        assertGt(moon.poolInfo().pendingValue, 10000 * 10 ** 6);
         vm.stopPrank();
     }
 
-    function testInputUSDT2()public{
+    function testInputUSDT2() public {
         testUSDTDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'00000000000000000000000000000000000000000000018d00006800004e802026678dcd94b008aa00579c1307b0ef2c499ad98a8ce58e58b4f34d09124b8c9712957b76707b42510041ecbb000000000000000000000000000000000000000000000000000000000000e47d0020d6bdbf7894b008aa00579c1307b0ef2c499ad98a8ce58e5800a007e5c0d200000000000000000000000000000000000000000000010100009e00004f02a000000000000000000000000000000000000000000000000190edf3231e27bbacee63c1e5018323d063b1d12acce4742f1e3ed9bc46d71f422294b008aa00579c1307b0ef2c499ad98a8ce58e5802a0000000000000000000000000000000000000000000000000002c6ad8abe018aaee63c1e50095d9d28606ee55de7667f0f176ebfc3215cfd9c0da10009cbd5d07dd0cecc66161fc93d7c9000da102a0000000000000000000000000000000000000000000000000867751abee522b41ee63c1e581fc1f3296458f9b2a27a0b91dd7681c4020e09d0542000000000000000000000000000000000000061111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'39363544813d809cca156dfb839a23163fb6ddd448932823bf18e5c122a0bd5c3856e8165ad32c39df148dbc84179129ff6ca21f2847f143a1416c05ce9df2841c';
-        para.inData = hex"0000000000000000000000000000000000000000000000000000000000f05120eaf1ac8e89ea0ae13e0f03634a4ff23502527024420000000000000000000000000000000000004200447dc20382000000000000000000000000420000000000000000000000000000000000004200000000000000000000000094b008aa00579c1307b0ef2c499ad98a8ce58e58000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000118e3f000000000000000000000000001111111254eeb25477b68fb85ed929f73a96058200000000000000000000000042f527f50f16a103b6ccab48bccca214500c1021";
-        moon.input(1,para);
-        assertEq(moon.poolInfo().pendingValue,100000*10**6);
-        assertGt(moon.tokenMuch(),0);
+        para.amountOut = 1000 ether;
+        para.maxAmountIn = 4400 * 10 ** 6;
+        moon.input(1, para);
+        assertGt(moon.poolInfo().pendingValue, 4000 * 10 ** 6);
         vm.stopPrank();
     }
-    function testInputUSDT3()public{
+    function testInputUSDT3() public {
         testUSDTDeposit();
         vm.startPrank(developer);
         MoonPool.SignatureParams memory para;
-        bytes memory data = hex'00000000000000000000000000000000000000000000044e0004200003d600a098aed105000000000000000006040000000000000000000000000000000000000000000000000003a800024c00a0bdb6942194b008aa00579c1307b0ef2c499ad98a8ce58e58b80d90fcf2ed0e4febe02d2a209109bf1f62df9500000000000000000000000000000000000000000000000014ff965280ab387b0000000000000000000000000000000000000000000000000000000001e000a007e5c0d20000000000000000000000000000000000000000000000000001bc00004f02a000000000000000000000000000000000000000000000000000000000d06812bdee63c1e500f1f199342687a7d78bcc16fce79fa2665ef870e194b008aa00579c1307b0ef2c499ad98a8ce58e5800a0c9e75c480000000000000000270b00000000000000000000000000000000000000000000000000013f00004f02a0000000000000000000000000000000000000000000000000049ea34998739d15ee63c1e50085149247691df622eaf1a8bd0cafd40bc45154a97f5c764cbc14f9669b88837ca1490cca17c316075120eaf1ac8e89ea0ae13e0f03634a4ff235025270247f5c764cbc14f9669b88837ca1490cca17c3160700447dc203820000000000000000000000007f5c764cbc14f9669b88837ca1490cca17c31607000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000001060f308e8379b66000000000000000000000000b63aae6c353636d66df13b89ba4425cfe13d10ba00000000000000000000000042f527f50f16a103b6ccab48bccca214500c102100a0bdb6942194b008aa00579c1307b0ef2c499ad98a8ce58e58b80d90fcf2ed0e4febe02d2a209109bf1f62df950000000000000000000000000000000000000000000000001f7f7444dd9dd2120000000000000000000000000000000000000000000000000000000000f05120eaf1ac8e89ea0ae13e0f03634a4ff2350252702494b008aa00579c1307b0ef2c499ad98a8ce58e5800447dc2038200000000000000000000000094b008aa00579c1307b0ef2c499ad98a8ce58e58000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000001f7f7444dd9dd212000000000000000000000000b63aae6c353636d66df13b89ba4425cfe13d10ba00000000000000000000000042f527f50f16a103b6ccab48bccca214500c102100a0f2fa6b6642000000000000000000000000000000000000060000000000000000000000000000000000000000000000003506ca0d42cb126c00000000000000000007af5dc00b118d80a06c4eca2742000000000000000000000000000000000000061111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'9444249155b2e925e0169d11cd79b6846a091f0b33fad326ab9009b80199582d52b93de1ea29eb1e6e6dbbed803f7ea582108467b7dd437057be92ce7ddd67ae1b';
-        para.inData = hex"0000000000000000000000000000000000000000000000000000000000f05120eaf1ac8e89ea0ae13e0f03634a4ff23502527024420000000000000000000000000000000000000600447dc20382000000000000000000000000420000000000000000000000000000000000000600000000000000000000000094b008aa00579c1307b0ef2c499ad98a8ce58e580000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000009c75db140000000000000000000000001111111254eeb25477b68fb85ed929f73a96058200000000000000000000000042f527f50f16a103b6ccab48bccca214500c1021";
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.input(2,para);
-        assertEq(moon.poolInfo().pendingValue,100000*10**6);
-        assertGt(moon.tokenMuch(),0);
+        para.amountOut = 5 * 10 ** 8;
+        para.maxAmountIn = 11000 * 10 ** 6;
+        moon.input(2, para);
+        assertGt(moon.poolInfo().pendingValue, 10000 * 10 ** 6);
         vm.stopPrank();
     }
 
-    function testGainUSDT1()public{
+    function testGainUSDT1() public {
         testInputUSDT1();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000000000000001f700a007e5c0d20000000000000000000000000000000000000000000000000001d30001705126a062ae8a9c5e11aaa026fc2670b0d65ccc8b2858296f55f8fb28e498b858d0bcda06d955b2cb3f970004cac88ea90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000184812900000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000b63aae6c353636d66df13b89ba4425cfe13d10ba0000000000000000000000000000000000000000000000000000000066c2f0040000000000000000000000000000000000000000000000000000000000000001000000000000000000000000296f55f8fb28e498b858d0bcda06d955b2cb3f970000000000000000000000007f5c764cbc14f9669b88837ca1490cca17c316070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f1046053aa5682b4f9a81b5481394da16be5ff5a00a0fbb7cd06809da11ff60bfc5af527f58fd61679c3ac98d040d90000000000000000000001007f5c764cbc14f9669b88837ca1490cca17c3160794b008aa00579c1307b0ef2c499ad98a8ce58e581111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'00b2a6ed4a13a5433ec9db2221d601593f48058ab758c1b970f292324901b34e37fc9fc21e565a6c31f91c3bcdbb7024cec1e8eb5fa9a786acf7990f1c325d381b';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertEq(IERC20(USDT).balanceOf(owner),0);
         vm.stopPrank();
     }
-    function testGainUSDT2()public{
+    function testGainUSDT2() public {
         testInputUSDT2();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000000000000000f05120eaf1ac8e89ea0ae13e0f03634a4ff23502527024420000000000000000000000000000000000004200447dc20382000000000000000000000000420000000000000000000000000000000000004200000000000000000000000094b008aa00579c1307b0ef2c499ad98a8ce58e58000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000118e3f000000000000000000000000001111111254eeb25477b68fb85ed929f73a96058200000000000000000000000042f527f50f16a103b6ccab48bccca214500c1021';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'8eab3d511340eda58b59aae931cb59d38209c436c0cdaae548ba1b90ccb40ef96a977942f28f087e8c0fcdbff66d84ff08ec65816a70c9a9a2d69e8ec0b0fd631c';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertGt(IERC20(USDT).balanceOf(owner),38 *10**6);
         vm.stopPrank();
     }
-    function testGainUSDT3()public{
+    function testGainUSDT3() public {
         testInputUSDT3();
         vm.startPrank(developer);
-        MoonPool.SignatureParams memory para;
-        bytes memory data = hex'0000000000000000000000000000000000000000000000000000000001f700a007e5c0d20000000000000000000000000000000000000000000000000001d30001705126a062ae8a9c5e11aaa026fc2670b0d65ccc8b285842000000000000000000000000000000000000060004cac88ea9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000086588d76fcba800000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000b63aae6c353636d66df13b89ba4425cfe13d10ba0000000000000000000000000000000000000000000000000000000066cf788d000000000000000000000000000000000000000000000000000000000000000100000000000000000000000042000000000000000000000000000000000000060000000000000000000000001f32b1c2345538c0c6f582fcb022739c4a194ebb0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f1046053aa5682b4f9a81b5481394da16be5ff5a02a00000000000000000000000000000000000000000000000000000000000695e4bee63c1e58195d7d146ae40d4822c2750276b54b6eed530d3741f32b1c2345538c0c6f582fcb022739c4a194ebb1111111254eeb25477b68fb85ed929f73a960582';
-        para.amount = 100000*10**6;
-        para.minReturnAmount = 10;
-        para.falgs = 4;
-        para.deadline = 1806855972;
-        para.mask = 0x4481f3b2a39e0be4ddbe366390d3aa160dd14cc8c982f458b5b0ccd8c5e2ea67;
-        para.data = data;
-        para.signature = hex'd8053128705c2ef44e50db638b7cb61d238b1d269e973945bbbb27d2b0e3b86b29e20c329cf3332650fcfbafa241afca46f137f421acecb7960bc3679ca30efa1b';
-        // console.log(IERC20(DAI).balanceOf(address(moon)));
-        moon.gain(1,para);
-        assertEq(moon.poolInfo().pendingValue,0);
-        console.log("owner reward: ",IERC20(USDT).balanceOf(owner));
+        moon.gain(1);
+        assertEq(moon.poolInfo().pendingValue, 0);
+        assertGt(IERC20(USDT).balanceOf(owner),195 *10**6);
         vm.stopPrank();
     }
 }
 
-contract Doubler{
+contract Doubler {
     struct Asset {
         bool isOpen;
     }
@@ -460,10 +667,10 @@ contract Doubler{
         address asset;
         address creator;
         address terminator;
-        uint16 fallRatio;//100-200
-        uint16 profitRatio;//50-10000
-        uint16 rewardRatio;//0-10000
-        uint16 winnerRatio;//0-10000
+        uint16 fallRatio;
+        uint16 profitRatio;
+        uint16 rewardRatio;
+        uint16 winnerRatio;
         uint32 double;
         uint32 lastLayer;
         uint256 tokenId;
@@ -472,7 +679,7 @@ contract Doubler{
         uint256 winnerOffset;
         uint256 endPrice;
         uint256 lastOpenPrice;
-        uint256 tvl;//>0
+        uint256 tvl;
         uint256 amount;
         uint256 margin;
         uint256 joins;
@@ -487,19 +694,21 @@ contract Doubler{
         uint256 amount;
         uint256 curPrice;
     }
-    mapping(address => Asset)public tokens;
+    mapping(address => Asset) public tokens;
     address constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     Pool[] pools;
     IFRNFT fr;
-    function getAssetConfigMap(address token)public view returns(Asset memory){
+    function getAssetConfigMap(
+        address token
+    ) public view returns (Asset memory) {
         return tokens[token];
     }
 
-    function getPool(uint256 poolId)public view returns(Pool memory){
+    function getPool(uint256 poolId) public view returns (Pool memory) {
         return pools[poolId];
     }
 
-    function createDoubler(address token)public{
+    function createDoubler(address token) public {
         Pool memory pool;
         pool.asset = token;
         pool.creator = msg.sender;
@@ -511,22 +720,27 @@ contract Doubler{
         pools.push(pool);
     }
 
-    constructor(address[] memory _tokens){
-        for(uint i =0;i<_tokens.length;i++){
+    constructor(address[] memory _tokens) {
+        for (uint i = 0; i < _tokens.length; i++) {
             tokens[_tokens[i]].isOpen = true;
         }
     }
 
-    function input(AddInput memory _addInput) external payable returns (uint256 tokenId){
+    function input(
+        AddInput memory _addInput
+    ) external payable returns (uint256 tokenId) {
         Pool memory pool = pools[_addInput.poolId];
-        if (pool.asset==ETH){
-            require(msg.value>=_addInput.margin,'insufficient ETH');
-        }else{
-            if (IERC20(pool.asset).allowance(msg.sender, address(this)) < _addInput.margin) revert();
-            if (IERC20(pool.asset).balanceOf(msg.sender) < _addInput.margin) revert();
-        }
-
-        IERC20(pool.asset).transferFrom(msg.sender, address(this), _addInput.margin);
+        if (
+            IERC20(pool.asset).allowance(msg.sender, address(this)) <
+            _addInput.margin
+        ) revert();
+        if (IERC20(pool.asset).balanceOf(msg.sender) < _addInput.margin)
+            revert();
+        IERC20(pool.asset).transferFrom(
+            msg.sender,
+            address(this),
+            _addInput.margin
+        );
         tokenId = fr.mint(
             msg.sender,
             _addInput.poolId,
@@ -537,38 +751,60 @@ contract Doubler{
             0
         );
     }
-    function setNft(address _fr)public{
+    function setNft(address _fr) public {
         fr = IFRNFT(_fr);
     }
-    function gain(uint256 _tokenId) external returns(uint256 amount) {
+    function gain(uint256 _tokenId) external returns (uint256 amount) {
         FRNFT.Traits memory nft = fr.getTraits(_tokenId);
         Pool memory pool = pools[nft.poolId];
-        if (pool.asset==ETH){
-            amount = address(this).balance;
-            payable(msg.sender).call{value : amount}('');
-        }else{
-            amount = IERC20(pool.asset).balanceOf(address(this));
-            IERC20(pool.asset).transfer(msg.sender,amount);
-        }
+        amount = IERC20(pool.asset).balanceOf(address(this));
+        IERC20(pool.asset).transfer(msg.sender, amount);
     }
 }
-contract DbrFarm{
+contract DbrFarm {
     Token dbr;
-    constructor(address _dbr){
+    constructor(address _dbr) {
         dbr = Token(_dbr);
     }
-    function join(uint256 _tokenId) external{}
-    function left(uint256 _tokenId) external returns(uint256 claimAmount){
+    function join(uint256 _tokenId) external {}
+    function left(uint256 _tokenId) external returns (uint256 claimAmount) {
         dbr.mint(10 ether);
-        dbr.transfer(msg.sender,10 ether);
+        dbr.transfer(msg.sender, 10 ether);
         claimAmount = 10 ether;
     }
 }
-contract Token is ERC20,Ownable{
-    constructor(string memory name,string memory symbol)ERC20(name,symbol){}
+contract Token is ERC20, Ownable {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
-    function mint(uint256 amount)public{
-        
-        _mint(msg.sender,amount);
+    function mint(uint256 amount) public {
+        _mint(msg.sender, amount);
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        if (
+            keccak256(bytes(name())) == keccak256(bytes("USDT")) ||
+            keccak256(bytes(name())) == keccak256(bytes("USDC"))
+        ) {
+            return 6;
+        } else {
+            return 18;
+        }
+    }
+}
+
+contract WETH9 is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+    function decimals() public view virtual override returns (uint8) {
+        return 8;
+    }
+    function deposit() public payable {
+        _mint(msg.sender, msg.value);
+    }
+    function withdraw(uint256 amount) public {
+        _burn(msg.sender, amount);
+        payable(msg.sender).call{value: amount}("");
+    }
+    function mint(uint256 amount) public {
+        _mint(msg.sender, amount);
     }
 }

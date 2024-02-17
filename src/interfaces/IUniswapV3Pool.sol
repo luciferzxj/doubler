@@ -20,6 +20,14 @@ interface IUniswapV3Pool {
         uint32[] calldata secondsAgos
     ) external view returns (int56[] memory tickCumulatives, uint160[] memory secondsPerLiquidityCumulativeX128s);
 
+    function mint(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount,
+        bytes calldata data
+    ) external;
+    function initialize(uint160 sqrtPriceX96) external;
     function observations(uint256 index) external view returns (Observation memory);
 
     function slot0() external view returns (Slot0 memory);
