@@ -2,22 +2,39 @@
 
 pragma solidity ^0.8.12;
 
-// import './IMoonPoolBlast.sol';
+import './IMoonPool.sol';
 
 interface IMoonPoolFactory {
-    struct MoonPoolBaseConfig {
-        address dev;
-        address doubler;
-        address dbr;
-        address dbrFarm;
-        address nft;
-        address aggregator;
-        address pricefeed;
+
+    error E_asset(); 
+    error E_initAmount();
+
+    struct BaseConfig {
+        address eco; // eco system
+        address dbr; // dbr token
+        address dbrFarm; //dbr farm
+        address frnft;
+        address doubler; // doubler 
+        address priceFeed; 
+        address swapRouter;
     }
 
+    event UpdateAsset(address asset , bool isSupported);
+
+    event CreateMoonPool(uint256 poolId, address moonPool, address asset, uint256 duration, uint256 cap, uint256 initAmount, uint256 rewardRatio);
+
+    function baseConfig() external view returns (BaseConfig memory);
+
     function moonPools() external view returns (address[] memory _pools);
+    
+    function moonPool(uint128 _pooId) external view returns (address);
 
-    function allMoonPoolLength() external view returns (uint);
-
-    event UpdateAggregatorConfig(address router);
+    function createMoonPool(
+        address _srcAsset,
+        IMoonPool.InputRule[] calldata _rules,
+        uint256 _duration,
+        uint256 _cap,
+        uint256 _initAmount,
+        uint256 _rewardRatio
+    ) external ;
 }

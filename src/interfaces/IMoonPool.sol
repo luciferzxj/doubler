@@ -1,16 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
-// import './IOneInch.sol';
 
 interface IMoonPool {
-    // map (pooId => Pool)
+
+    error E_duration();
+    error E_cap();
+    error E_rewardRatio();
+    error E_rules();
+    error E_fallRatio();
+    error E_profitRatio();
+    error E_rewardRatioMax();
+    error E_winnerRatioMax();
+    error E_tvl();
+    error E_sell_limit();
+    error E_pool_end();
+    error E_pool_check();
+    error E_creator();
+    error E_asset();
+    error E_poolend();
+    
     struct Pool {
-        bool started;
-        uint256 inValue;
-        uint256 pendingValue;
-        uint256 outValue;
+        uint256 pendingValue; // 
+        uint256 output;
+        uint256 input;
         uint256 capMax;
         uint256 dbrAmount;
+        // uint256 startTime;
         uint256 endTime;
     }
 
@@ -32,31 +47,26 @@ interface IMoonPool {
     // map(pooId => map(tokenId => Bill))
     struct InputRecord {
         bool isWithdraw;
-        address asset;
         uint256 spend;
         uint256 income;
     }
 
     struct PoolConfig {
         address creator;
-        address developer;
+        address eco;
         address asset;
         address doubler;
         address dbr;
         address dbrFarm;
-        address FRNFT;
-        address aggregator;
-        address pricefeed;
+        address frnft;
+        address priceFeed;
+        address swapRouter;
     }
 
-    struct SignatureParams {
-        uint256 amountOut;
-        uint256 maxAmountIn;
-    }
+    event Buy(address user, uint256 lpAmount, uint256 spendAmount);
 
-    event NewPool(address creator, address lp);
-    event Start();
-    event Deposite(address buyer, uint256 amount, uint256 lp);
+    event Sell(address user, uint256 lpAmount, uint256 uAmount, uint256 fee,  uint256 dbrAmount);
+
     event UpdateInputRule(
         address asset,
         uint16 fallRatioMin,
@@ -71,12 +81,6 @@ interface IMoonPool {
         uint256 layerInputMax
     );
 
-    event Withdraw(
-        address buyer,
-        uint256 lpAmount,
-        uint256 uAmount,
-        uint256 dbrAmount
-    );
     event NewInput(
         uint256 indexed doublerId,
         uint256 lastLayer,
@@ -84,47 +88,29 @@ interface IMoonPool {
         uint256 spentAmount,
         uint256 inputAmount
     );
-    event Gain(uint256 tokenIds, uint256 spend, uint256 uSell, uint256 mintDbr);
 
-    function initialize(
-        address _creator,
-        address _dev,
-        address dbrContract,
-        address _doublerContract,
-        address _dbrFarmContract,
-        address _nft,
-        address _router,
-        address _srcAsset,
-        address _pricefeed
-    ) external;
+    event NftBill(uint256 indexed doublerId, uint256  indexed tokenId, uint256 output,  uint256 input,  uint256 dbr);
 
-    function start(
-        InputRule[] calldata _rules,
-        uint256 _duration,
-        uint256 _cap,
-        uint256 _initAmount,
-        uint256 _rewardRatio
-    ) external;
+    event Gain(uint256 tokenId, uint256 spend, uint256 uSell, uint256 mintDbr);
+
 
     function updateRule(InputRule calldata _inputRule) external;
 
-    function deposite(uint256 _amount) external;
+    function buy(uint256 _amount, address _to) external;
 
-    function withdraw(uint256 _amount) external;
+    function sell(uint256 _lpAmount)  external returns(uint256 uAmount) ;
 
-    function input(uint256 _doublerId, SignatureParams memory datas) external;
+    function input(uint256 _doublerId) external;
 
     function gain(uint256 _tokenId) external;
 
     function getFactory() external view returns (address);
 
-    function inputRecord(
-        uint256 tokenId
-    ) external view returns (InputRecord memory record);
+    function inputRecord(uint256 _tokenId) external view returns (InputRecord memory record);
 
     function poolInfo() external view returns (Pool memory pool);
+    
+    function ruleMap(address _asset) external view returns (InputRule memory rule);
 
-    function ruleMap(
-        address asset
-    ) external view returns (InputRule memory rule);
+    function tokenMuch() external view returns (uint256);
 }
