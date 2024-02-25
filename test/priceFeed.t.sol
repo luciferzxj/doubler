@@ -29,7 +29,61 @@ contract priceFeedTest is Test{
         oracle = new FastPriceFeed(owner);
 
     }
+    function testAll()public{
+        console.log("start testWETH");
+        testWETH();
+        console.log("end testWETH");
+        console.log("");
 
+        console.log("start testWLD");
+        testWLD();
+        console.log("end testWLD");
+        console.log("");
+
+        console.log("start testOP");
+        testOP();
+        console.log("end testOP");
+        console.log("");
+
+        console.log("start testUSDC");
+        testUSDC();
+        console.log("end testUSDC");
+        console.log("");
+
+        console.log("start testWBTC");
+        testWBTC();
+        console.log("end testWBTC");
+        console.log("");
+
+        console.log("start testDAI");
+        testDAI();
+        console.log("end testDAI");
+        console.log("");
+
+        console.log("start testUSDT");
+        testUSDT();
+        console.log("end testUSDT");
+        console.log("");
+
+        console.log("start testLINK");
+        testLINK();
+        console.log("end testLINK");
+        console.log("");
+
+        console.log("start testSUSD");
+        testSUSD();
+        console.log("end testSUSD");
+        console.log("");
+
+        console.log("start testDOGE");
+        testDOGE();
+        console.log("end testDOGE");
+        console.log("");
+
+        console.log("start testONE");
+        testONE();
+        console.log("end testONE");
+    }
     function testWETH()public{
 
         vm.startPrank(owner);
@@ -42,9 +96,11 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(WETH,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
         uint256 priceDex = oracle.getPrice(WETH);
-        console.log("WETH dex price :",priceDex);
+        console.log("WETH Uniswap price :",priceDex);
 
         vm.stopPrank();
     }
@@ -63,26 +119,29 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(WLD,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
 
         uint256 priceDex = oracle.getPrice(WLD);
-        console.log("WLD dex price :",priceDex);
+        console.log("WLD Uniswap price :",priceDex);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(WLD,chainlink,plan,bytes32(0),0);
-        uint256 priceCex = oracle.getPrice(WLD);
-        console.log("WLD cex price :",priceCex);
+        console.log("upgradePlan end1");
+        uint256 priceChainlink = oracle.getPrice(WLD);
+        console.log("WLD Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(WLD,pyth,plan,pythId,1 days);
-        uint256 pricePex = oracle.getPrice(WLD);
-        console.log("WLD pex price :",pricePex);
+        console.log("upgradePlan end2");
+        uint256 pricePyth = oracle.getPrice(WLD);
+        console.log("WLD Pyth price :",pricePyth);
         
         vm.stopPrank();
     }
 
     function testOP()public{
-
         vm.startPrank(owner);
         address chainlink = 0x0D276FC14719f9292D5C1eA2198673d1f4269246;
         address univ3pool = 0x1C3140aB59d6cAf9fa7459C6f83D4B52ba881d36;
@@ -96,20 +155,24 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(OP,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
 
-        uint256 priceCex = oracle.getPrice(OP);
-        console.log("OP dex price :",priceCex);
+        uint256 priceChainlink = oracle.getPrice(OP);
+        console.log("OP Uniswap price :",priceChainlink);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(OP,chainlink,plan,bytes32(0),0);
+        console.log("upgradePlan end1");
         uint256 priceDex = oracle.getPrice(OP);
-        console.log("OP cex price :",priceDex);
+        console.log("OP Chainlink price :",priceDex);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(OP,pyth,plan,pythId,1 days);
-        uint256 pricePex = oracle.getPrice(OP);
-        console.log("OP pex price :",pricePex);
+        console.log("upgradePlan end2");
+        uint256 pricePyth = oracle.getPrice(OP);
+        console.log("OP Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -129,20 +192,24 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(USDC,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
 
         uint256 priceDex = oracle.getPrice(USDC);
-        console.log("USDC dex price :",priceDex);
+        console.log("USDC Uniswap price :",priceDex);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(USDC,chainlink,plan,bytes32(0),0);
-        uint256 priceCex = oracle.getPrice(USDC);
-        console.log("USDC cex price :",priceCex);
+        console.log("upgradePlan end1");
+        uint256 priceChainlink = oracle.getPrice(USDC);
+        console.log("USDC Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(USDC,pyth,plan,pythId,200 days);
-        uint256 pricePex = oracle.getPrice(USDC);
-        console.log("USDC pex price :",pricePex);
+        console.log("upgradePlan end2");
+        uint256 pricePyth = oracle.getPrice(USDC);
+        console.log("USDC Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -161,15 +228,17 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(WBTC,chainlink,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
 
-        uint256 priceCex = oracle.getPrice(WBTC);
-        console.log("WBTC cex price :",priceCex);
+        uint256 priceChainlink = oracle.getPrice(WBTC);
+        console.log("WBTC Chainlink price :",priceChainlink);
 
         // plan = IFastPriceFeed.Plan.PYTH;
         // oracle.upgradePlan(WBTC,pyth,plan,pythId,200 days);
-        // uint256 pricePex = oracle.getPrice(WBTC);
-        // console.log("WBTC pex price :",pricePex);
+        // uint256 pricePyth = oracle.getPrice(WBTC);
+        // console.log("WBTC Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -188,19 +257,23 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(USDT,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
         uint256 priceDex = oracle.getPrice(USDT);
-        console.log("USDT dex price :",priceDex);
+        console.log("USDT Uniswap price :",priceDex);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(USDT,chainlink,plan,bytes32(0),0);
-        uint256 priceCex = oracle.getPrice(USDT);
-        console.log("USDT cex price :",priceCex);
+        console.log("upgradePlan end1");
+        uint256 priceChainlink = oracle.getPrice(USDT);
+        console.log("USDT Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(USDT,pyth,plan,pythId,100 days);
-        uint256 pricePex = oracle.getPrice(USDT);
-        console.log("USDT pex price :",pricePex);
+        console.log("upgradePlan end2");
+        uint256 pricePyth = oracle.getPrice(USDT);
+        console.log("USDT Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -219,14 +292,17 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(SUSD,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
         uint256 priceDex = oracle.getPrice(SUSD);
-        console.log("SUSD dex price :",priceDex);
+        console.log("SUSD Uniswap price :",priceDex);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(SUSD,chainlink,plan,bytes32(0),0);
-        uint256 priceCex = oracle.getPrice(SUSD);
-        console.log("SUSD cex price :",priceCex);
+        console.log("upgradePlan end");
+        uint256 priceChainlink = oracle.getPrice(SUSD);
+        console.log("SUSD Chainlink price :",priceChainlink);
 
         vm.stopPrank();
     }
@@ -246,19 +322,23 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(DAI,univ3pool,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
         uint256 priceDex = oracle.getPrice(DAI);
-        console.log("DAI dex price :",priceDex);
+        console.log("DAI Uniswap price :",priceDex);
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.upgradePlan(DAI,chainlink,plan,bytes32(0),0);
-        uint256 priceCex = oracle.getPrice(DAI);
-        console.log("DAI cex price :",priceCex);
+        console.log("upgradePlan end1");
+        uint256 priceChainlink = oracle.getPrice(DAI);
+        console.log("DAI Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(DAI,pyth,plan,pythId,1000 days);
-        uint256 pricePex = oracle.getPrice(DAI);
-        console.log("DAI pex price :",pricePex);
+        console.log("upgradePlan end2");
+        uint256 pricePyth = oracle.getPrice(DAI);
+        console.log("DAI Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -275,15 +355,18 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(DOGE,chainlink,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
 
-        uint256 priceCex = oracle.getPrice(DOGE);
-        console.log("DOGE cex price :",priceCex);
+        uint256 priceChainlink = oracle.getPrice(DOGE);
+        console.log("DOGE Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(DOGE,pyth,plan,pythId,1 days);
-        uint256 pricePex = oracle.getPrice(DOGE);
-        console.log("DOGE pex price :",pricePex);
+        console.log("upgradePlan end");
+        uint256 pricePyth = oracle.getPrice(DOGE);
+        console.log("DOGE Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
@@ -301,22 +384,23 @@ contract priceFeedTest is Test{
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(LINK,chainlink,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
+        console.log("batchSetAssetPriceLimit end");
         // oracle.getLastedDataFromChainlink(LINK);
-        uint256 priceCex = oracle.getPrice(LINK);
-        console.log("LINK cex price :",priceCex);
+        uint256 priceChainlink = oracle.getPrice(LINK);
+        console.log("LINK Chainlink price :",priceChainlink);
 
         plan = IFastPriceFeed.Plan.PYTH;
         oracle.upgradePlan(LINK,pyth,plan,pythId,1 days);
-        uint256 pricePex = oracle.getPrice(LINK);
-        console.log("LINK pex price :",pricePex);
+        console.log("upgradePlan end");
+        uint256 pricePyth = oracle.getPrice(LINK);
+        console.log("LINK Pyth price :",pricePyth);
 
         vm.stopPrank();
     }
 
     function testONE()public{
-        //ONE-USDC
-        // DoublerOracle.AssetOracle memory asset;
         vm.startPrank(owner);
         address chainlink = 0x7CFB4fac1a2FDB1267F8bc17FADc12804AC13CFE;
 
@@ -327,9 +411,12 @@ contract priceFeedTest is Test{
         
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(ONE,chainlink,bytes32(0),5 minutes,plan,0);
+        console.log("newAsset end");
         oracle.batchSetAssetPriceLimit(token,limit);
-        uint256 priceCex = oracle.getPrice(ONE);
-        console.log("ONE cex price :",priceCex);
+        console.log("batchSetAssetPriceLimit end");
+
+        uint256 priceChainlink = oracle.getPrice(ONE);
+        console.log("ONE Chainlink price :",priceChainlink);
 
         vm.stopPrank();
     }
