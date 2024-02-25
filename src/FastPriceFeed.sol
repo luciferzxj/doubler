@@ -192,7 +192,7 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
 
     mapping(address =>bytes32) internal _pythAssetPriceIdMap;
     mapping(address =>address) internal _pythAssetMap;
-
+    mapping(address =>uint256) internal _pythAssetTime;
 
     constructor(address _initMultiSigWallet) {
         _grantRole(DEFAULT_ADMIN_ROLE, _initMultiSigWallet);
@@ -203,18 +203,19 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         _;
     }
 
-     function initPyhonPriceFeed(address _asset, address _oracleAddr,  bytes32 priceId) internal {
+     function initPyhonPriceFeed(address _asset, address _oracleAddr,  bytes32 priceId,uint256 timelimit) internal {
         _pythAssetPriceIdMap[_asset] = priceId;
         _pythAssetMap[_asset]   = _oracleAddr;
+        _pythAssetTime[_asset] = timelimit;
         //check priceId 
-        PythStructs.Price memory _price = IPyth( _pythAssetMap[_oracleAddr]).getPrice(priceId);
+        PythStructs.Price memory _price = IPyth(_oracleAddr).getPriceNoOlderThan(priceId,timelimit);
         require(_price.price > 0, "priceId error");
         emit InitPyhonPriceFeed(_asset, _oracleAddr, priceId);
     }
 
     function getPytPrice(address _token) public view returns (uint256 price) {
         bytes32 priceId= _pythAssetPriceIdMap[_token];
-        PythStructs.Price memory _price = IPyth( _pythAssetMap[_token]).getPrice(priceId);
+        PythStructs.Price memory _price = IPyth( _pythAssetMap[_token]).getPriceNoOlderThan(priceId,_pythAssetTime[_token]);
         uint32 expo = uint32(_price.expo < 0 ? -_price.expo : _price.expo);
         uint64 pythPrice = uint64(_price.price > 0 ? _price.price : -_price.price);
         price = _priceDecimals.mul(pythPrice).div(10 ** expo);
@@ -260,7 +261,8 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         address _assetPriceFeed,
         bytes32 _assetPriceId,  // only for pyth oracle
         uint32 _twapInterval,
-        Plan _plan
+        Plan _plan,
+        uint256 timelimit
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _isSupported[_asset] = true;
         _plans[_asset] = _plan;
@@ -268,25 +270,25 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
             initDexPriceFeed(_asset, _assetPriceFeed);
             _twapIntervals[_asset] = _twapInterval;
         } else if (_plan == Plan.PYTH) {
-            initPyhonPriceFeed(_asset, _assetPriceFeed, _assetPriceId);
+            initPyhonPriceFeed(_asset, _assetPriceFeed, _assetPriceId,timelimit);
         }  else {
             initChainlinkPriceFeed(_asset, _assetPriceFeed);
         }
         emit AddAsset(_asset, _assetPriceFeed, _twapInterval);
     }
 
-    function updatePriceAggregator(address _asset, address _aggregator, bytes32 _priceId) external  isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updatePriceAggregator(address _asset, address _aggregator, bytes32 _priceId,uint256 timelimit) external  isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_aggregator != address(0), "zero address");
         if (_plans[_asset] == Plan.DEX) {
             initDexPriceFeed(_asset, _aggregator);
         } if (_plans[_asset] == Plan.PYTH) {
-            initPyhonPriceFeed(_asset, _aggregator, _priceId);
+            initPyhonPriceFeed(_asset, _aggregator, _priceId,timelimit);
         } else {
             initChainlinkPriceFeed(_asset, _aggregator);
         }
     }
 
-    function upgradePlan(address _asset, address _aggregator, Plan _plan, bytes32 _priceId) external isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
+    function upgradePlan(address _asset, address _aggregator, Plan _plan, bytes32 _priceId,uint256 timelimit) external isSupportedToken(_asset) onlyRole(DEFAULT_ADMIN_ROLE) {
         // todo remove limit;
         // require(_plans[_asset] == Plan.DEX, "only DEX mode");
         require(_aggregator != address(0), "zero address");
@@ -294,7 +296,7 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         if (_plan == Plan.DEX) {
             initDexPriceFeed(_asset, _aggregator);
         } if (_plans[_asset] == Plan.PYTH) {
-            initPyhonPriceFeed(_asset, _aggregator, _priceId);
+            initPyhonPriceFeed(_asset, _aggregator, _priceId,timelimit);
         }  else {
              initChainlinkPriceFeed(_asset, _aggregator);
         }
@@ -381,12 +383,12 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         if (pl == Plan.CHAINLINK) {
             price = getLastedDataFromChainlink(_asset);
             if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
-                pl = Plan.DEX;
-            }
+                revert();
+            } 
          } else if (pl == Plan.PYTH) {
             price = getPytPrice(_asset);
             if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
-                pl = Plan.DEX;
+                revert();
             }
         } else if (pl == Plan.DEX) {
             price = getPriceFromDex(_asset);
