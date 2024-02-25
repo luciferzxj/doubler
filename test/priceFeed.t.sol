@@ -31,14 +31,14 @@ contract priceFeedTest is Test{
     }
 
     function testWETH()public{
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address univ3pool = 0x03aF20bDAaFfB4cC0A521796a223f7D85e2aAc31;//WETH-DAI
         address[] memory token = new address[](1);
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = WETH;
         limit[0] = IFastPriceFeed.PriceLimit(3000*10**18,3100*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(WETH,univ3pool,bytes32(0),5 minutes,plan,0);
@@ -50,8 +50,7 @@ contract priceFeedTest is Test{
     }
 
     function testWLD()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x4e1C6B168DCFD7758bC2Ab9d2865f1895813D236;
         address univ3pool = 0xD1F1baD4c9E6c44DeC1e9bF3B94902205c5Cd6C3;
@@ -60,12 +59,12 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = WLD;
         limit[0] = IFastPriceFeed.PriceLimit(7*10**18,10*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(WLD,univ3pool,bytes32(0),5 minutes,plan,0);
         oracle.batchSetAssetPriceLimit(token,limit);
-        // oracle.getLastedDataFromChainlink(LINK);
+
         uint256 priceDex = oracle.getPrice(WLD);
         console.log("WLD dex price :",priceDex);
         
@@ -83,8 +82,7 @@ contract priceFeedTest is Test{
     }
 
     function testOP()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x0D276FC14719f9292D5C1eA2198673d1f4269246;
         address univ3pool = 0x1C3140aB59d6cAf9fa7459C6f83D4B52ba881d36;
@@ -94,12 +92,12 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = OP;
         limit[0] = IFastPriceFeed.PriceLimit(3*10**18,5*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(OP,univ3pool,bytes32(0),5 minutes,plan,0);
         oracle.batchSetAssetPriceLimit(token,limit);
-        // oracle.getLastedDataFromChainlink(LINK);
+
         uint256 priceCex = oracle.getPrice(OP);
         console.log("OP dex price :",priceCex);
         
@@ -117,8 +115,7 @@ contract priceFeedTest is Test{
     }
 
     function testUSDC()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x16a9FA2FDa030272Ce99B29CF780dFA30361E0f3;
         address univ3pool = 0xA73C628eaf6e283E26A7b1f8001CF186aa4c0E8E;
@@ -128,12 +125,12 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = USDC;
         limit[0] = IFastPriceFeed.PriceLimit(9*10**17,1.1*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(USDC,univ3pool,bytes32(0),5 minutes,plan,0);
         oracle.batchSetAssetPriceLimit(token,limit);
-        // oracle.getLastedDataFromChainlink(LINK);
+
         uint256 priceDex = oracle.getPrice(USDC);
         console.log("USDC dex price :",priceDex);
         
@@ -151,8 +148,7 @@ contract priceFeedTest is Test{
     }
 
     function testWBTC()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x718A5788b89454aAE3A028AE9c111A29Be6c2a6F;
         bytes32 pythId = 0xc9d8b075a5c69303365ae23633d4e085199bf5c520a3b90fed1322a0342ffc33;
@@ -166,7 +162,7 @@ contract priceFeedTest is Test{
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(WBTC,chainlink,bytes32(0),5 minutes,plan,0);
         oracle.batchSetAssetPriceLimit(token,limit);
-        // oracle.getLastedDataFromChainlink(LINK);
+
         uint256 priceCex = oracle.getPrice(WBTC);
         console.log("WBTC cex price :",priceCex);
 
@@ -178,7 +174,7 @@ contract priceFeedTest is Test{
         vm.stopPrank();
     }
     function testUSDT()public{
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0xECef79E109e997bCA29c1c0897ec9d7b03647F5E;
         address univ3pool = 0xA73C628eaf6e283E26A7b1f8001CF186aa4c0E8E;
@@ -188,7 +184,7 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = USDT;
         limit[0] = IFastPriceFeed.PriceLimit(9*10**17,1.1*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(USDT,univ3pool,bytes32(0),5 minutes,plan,0);
@@ -210,7 +206,7 @@ contract priceFeedTest is Test{
     }
 
     function testSUSD()public{
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x7f99817d87baD03ea21E05112Ca799d715730efe;
         address univ3pool = 0xAdb35413eC50E0Afe41039eaC8B930d313E94FA4;
@@ -219,7 +215,7 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = SUSD;
         limit[0] = IFastPriceFeed.PriceLimit(9*10**17,1.1*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(SUSD,univ3pool,bytes32(0),5 minutes,plan,0);
@@ -236,7 +232,7 @@ contract priceFeedTest is Test{
     }
 
     function testDAI()public{
-        // DoublerOracle.AssetOracle memory asset;
+
         vm.startPrank(owner);
         address chainlink = 0x8dBa75e83DA73cc766A7e5a0ee71F656BAb470d6;
         address univ3pool = 0x100bdC1431A9b09C61c0EFC5776814285f8fB248;
@@ -246,7 +242,7 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = DAI;
         limit[0] = IFastPriceFeed.PriceLimit(9*10**17,1.1*10**18);
-        // DoublerOracle.Plan plan;
+
 
         plan = IFastPriceFeed.Plan.DEX;
         oracle.newAsset(DAI,univ3pool,bytes32(0),5 minutes,plan,0);
@@ -268,8 +264,6 @@ contract priceFeedTest is Test{
     }
 
     function testDOGE()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
         vm.startPrank(owner);
         address chainlink = 0xC6066533917f034Cf610c08e1fe5e9c7eADe0f54;
         bytes32 pythId = 0xdcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c;
@@ -278,12 +272,11 @@ contract priceFeedTest is Test{
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = DOGE;
         limit[0] = IFastPriceFeed.PriceLimit(8*10**16,1*10**17);
-        // DoublerOracle.Plan plan;
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(DOGE,chainlink,bytes32(0),5 minutes,plan,0);
         oracle.batchSetAssetPriceLimit(token,limit);
-        // oracle.getLastedDataFromChainlink(LINK);
+
         uint256 priceCex = oracle.getPrice(DOGE);
         console.log("DOGE cex price :",priceCex);
 
@@ -296,8 +289,6 @@ contract priceFeedTest is Test{
     }
 
     function testLINK()public{
-        //WLD-USDC
-        // DoublerOracle.AssetOracle memory asset;
         vm.startPrank(owner);
         address chainlink = 0xCc232dcFAAE6354cE191Bd574108c1aD03f86450;
         bytes32 pythId = 0x8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221;
