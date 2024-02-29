@@ -2,6 +2,7 @@
 pragma solidity ^0.8.12;
 
 interface IDoublerHelper {
+
     struct PoolView {
         bool isInput;
         address asset;
@@ -64,8 +65,31 @@ interface IDoublerHelper {
         uint256 dbrAmount;
         bool doublerEnd;
     }
+
+    struct UserLpView {
+        uint128 id;
+        address addr;
+        uint256 lpAmount;
+        uint256 price;
+        uint256 value;
+    }
+
+    struct MoonPoolView {
+        string symbol;
+        uint128 id;
+        address addr;
+        address asset;
+        uint256 tvl;
+        uint256 output;
+        uint256 input;
+        uint256 lpPrice;
+        uint256 buyLimit;
+        uint256 sellLimit;
+    }
     
-    function getTokens() external view returns (TokenMeta[] memory res);
+    function getDoublerAllowAssets() external view returns (TokenMeta[] memory res);
+    
+    function getMoonPoolAllowAssets() external view returns (TokenMeta[] memory res);
 
     function getPoolView(uint256 _poolId) external view returns (PoolView memory pv);
     function getPoolList(uint256[] calldata _poolIds) external view returns (PoolView[] memory pools);
@@ -83,4 +107,7 @@ interface IDoublerHelper {
         uint256 offset,
         uint256 limit
     ) external view returns (NftFullView[] memory nftView);
+    function userMoonPoolLpView(address from) external view returns(uint256 tvlTotal, UserLpView[] memory list);
+    function getMoolPoolTvl() external view returns(uint256 tvl);
+    function getMoolPoolList(uint128[] memory poolIds) external view returns(MoonPoolView[] memory pools);
 }

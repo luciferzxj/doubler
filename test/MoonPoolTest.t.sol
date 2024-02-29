@@ -9,7 +9,7 @@ import "../src/FRNFT.sol";
 import "../src/interfaces/IUniswapV3Factory.sol";
 import "../src/interfaces/IUniswapV3Pool.sol";
 // import "../src/interfaces/IUniswapV3SwapRouter.sol";
-import "../src/SwapRouter.sol";
+import "../src/Aggregator.sol";
 import "../src/MoonPoolFactory.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -163,7 +163,7 @@ contract MoonTest is Test {
     }
     function testCreateFactory() public {
         vm.startPrank(owner);
-
+        console.log("start create moonpool factory");
         address[] memory tokens = new address[](6);
         tokens[0] = USDC;
         tokens[1] = DAI;
@@ -179,7 +179,8 @@ contract MoonTest is Test {
         Aggregator.RouterConfig memory temp;
         temp.uniswapV3Router = address(uniV3Router);
         temp.uniswapV2Router = address(uniV2Router);
-        aggregator = new Aggregator(temp);
+        aggregator = new Aggregator(temp,owner);
+        aggregator.updateSlippage(600);
         fr.initialize(address(doubler), owner);
         MoonPoolFactory.BaseConfig memory cfg;
         cfg.eco = developer;
@@ -194,6 +195,7 @@ contract MoonTest is Test {
         token[1] = USDC;
         token[2] = USDT;
         factory = new MoonPoolFactory(cfg, token);
+        console.log("end create moonpool factory");
         setStrategy();
         vm.stopPrank();
     }
@@ -383,11 +385,14 @@ contract MoonTest is Test {
         data2.path[1] = USDT;
         data2.ratio = 5000;
         aggregator.addUniV2Strategy(WETH, USDT, data2);
+
+        console.log("set swap startegy end");
     }
     //DAI池
     function testDaiCreatePool() public {
         testCreateFactory();
         vm.startPrank(owner);
+        console.log("start create DAI moonpool");
         doubler.createDoubler(USDT,10000 *10**6);
         doubler.createDoubler(USDC,10000 *10**6);
         doubler.createDoubler(OP,1000 ether);
@@ -435,91 +440,103 @@ contract MoonTest is Test {
         deal(USDT, address(doubler), 1000 * 10 ** 6);
         deal(OP, address(doubler), 100 ether);
         IERC20(DAI).approve(address(factory), 100000 ether);
+        MoonPoolFactory.AddMoonPool memory add;
+        add.srcAsset=DAI;
+        add.duration = 30 days;
+        add.cap = 1000000 ether;
+        add.initAmount = 100000 ether;
+        add.creatorRewardRatio = 1000;
+        add.triggerRewardRatio = 100;
+        add.sellLimitCapRatio =3000;
         factory.createMoonPool(
-            DAI,
-            rules,
-            30 days,
-            1000000 ether,
-            100000 ether,
-            1000
+            add,
+            rules
         );
-        assertEq(factory.moonPools().length, 1);
-        moon = IMoonPool(factory.moonPools()[0]);
-        assertEq(IERC20(address(moon)).balanceOf(owner), 102000 ether);
+        assertEq(factory.moonPoolTotal(), 1);
+        moon = IMoonPool(factory.getMoonPoolAddress(1));
+        assertEq(IERC20(address(moon)).balanceOf(owner), 100000 ether);
+        console.log("end create DAI moonpool");
         vm.stopPrank();
     }
 
     function testDaiDeposit() public {
         testDaiCreatePool();
         vm.startPrank(user1);
+        console.log("start buy DAI");
         IERC20(DAI).approve(address(moon), 100000 ether);
         moon.buy(100000 ether,user1);
-        assertEq(IERC20(address(moon)).balanceOf(user1), 104040 ether);
+        assertEq(IERC20(address(moon)).balanceOf(user1), 100000 ether);
+        console.log("end buy DAI");
         vm.stopPrank();
     }
 
     function testDaiWithdraw() public {
         testDaiDeposit();
         vm.startPrank(user1);
-        moon.sell(104040 ether);
-        assertEq(IERC20(address(moon)).totalSupply(), 102000 ether);
-        assertEq(IERC20(address(DAI)).balanceOf(user1) / 1 ether, 98970);
+        console.log("start sell DAI");
+        moon.sell(100000 ether);
+        assertEq(IERC20(address(moon)).totalSupply(), 100000 ether);
+        assertEq(IERC20(address(DAI)).balanceOf(user1) / 1 ether, 98000);
+        console.log("end sell DAI");
         vm.stopPrank();
     }
     function testInputDAI1() public {
         testDaiDeposit();
+        console.log("start input DAI to USDT doubler");
         vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 10000 * 10 ** 6;
-        // para.maxAmountIn = 11000 ether;
         moon.input(0);
         assertGt(moon.poolInfo().pendingValue, 10000 ether);
+        console.log("end input DAI to USDT doubler");
         vm.stopPrank();
     }
 
     function testInputDAI2() public {
         testDaiDeposit();
         vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 10000 * 10 ** 6;
-        // para.maxAmountIn = 11000 ether;
+        console.log("start input DAI to USDC doubler");
         moon.input(1);
         assertGt(moon.poolInfo().pendingValue, 10000 ether);
+        console.log("end input DAI to USDc doubler");
         vm.stopPrank();
     }
     function testInputDAI3() public {
         testDaiDeposit();
         vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 1000 ether;
-        // para.maxAmountIn = 4400 ether;
+        console.log("start input DAI to OP doubler");
         moon.input(2);
         assertGt(moon.poolInfo().pendingValue, 4000 ether);
+        console.log("start end DAI to OP doubler");
         vm.stopPrank();
     }
 
     function testGainDAI1() public {
         testInputDAI1();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain USDT doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertGt(IERC20(DAI).balanceOf(owner),90 ether);
+        console.log("end gain USDT doubler");
         vm.stopPrank();
     }
     function testGainDAI2() public {
         testInputDAI2();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain USDC doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertGt(IERC20(DAI).balanceOf(owner),90 ether);
+        console.log("end gain USDC doubler");
         vm.stopPrank();
     }
     function testGainDAI3() public {
         testInputDAI3();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain OP doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertGt(IERC20(DAI).balanceOf(owner),35 ether);
+        console.log("end gain OP doubler");
         vm.stopPrank();
     }
 
@@ -527,6 +544,7 @@ contract MoonTest is Test {
     function testUSDTCreatePool() public {
         testCreateFactory();
         vm.startPrank(owner);
+        console.log("start create USDT moonpool");
         doubler.createDoubler(USDC,10000 *10**6);
         doubler.createDoubler(OP,1000 ether);
         doubler.createDoubler(WETH,5 *10**8);
@@ -573,92 +591,104 @@ contract MoonTest is Test {
         deal(WETH, address(doubler), 1 * 10 ** 8);
         deal(OP, address(doubler), 100 ether);
         IERC20(USDT).approve(address(factory), 100000 * 10 ** 6);
+        MoonPoolFactory.AddMoonPool memory add;
+        add.srcAsset=USDT;
+        add.duration = 30 days;
+        add.cap = 1000000 *10**6;
+        add.initAmount = 100000*10**6;
+        add.creatorRewardRatio = 1000;
+        add.triggerRewardRatio = 100;
+        add.sellLimitCapRatio =3000;
         factory.createMoonPool(
-            USDT,
-            rules,
-            30 days,
-            1000000 * 10 ** 6,
-            100000 * 10 ** 6,
-            1000
+            add,
+            rules
         );
-        assertEq(factory.moonPools().length, 1);
-        moon = IMoonPool(factory.moonPools()[0]);
-        assertEq(IERC20(address(moon)).balanceOf(owner), 102000 * 10 ** 6);
+        assertEq(factory.moonPoolTotal(), 1);
+        moon = IMoonPool(factory.getMoonPoolAddress(1));
+        assertEq(IERC20(address(moon)).balanceOf(owner), 100000 * 10 ** 6);
+        console.log("end create USDT moonpool");
         vm.stopPrank();
     }
 
     function testUSDTDeposit() public {
         testUSDTCreatePool();
+        console.log("start buy USDT");
         vm.startPrank(user1);
         IERC20(USDT).approve(address(moon), 100000 * 10 ** 6);
         moon.buy(100000 * 10 ** 6, user1);
-        assertEq(IERC20(address(moon)).balanceOf(user1), 104040 * 10 ** 6);
+        assertEq(IERC20(address(moon)).balanceOf(user1), 100000 * 10 ** 6);
+        console.log("end buy USDT");
         vm.stopPrank();
     }
 
     function testUSDTWithdraw() public {
         testUSDTDeposit();
         vm.startPrank(user1);
-        moon.sell(104040 * 10 ** 6);
-        assertEq(IERC20(address(moon)).totalSupply(), 102000 * 10 ** 6);
-        assertEq(IERC20(address(USDT)).balanceOf(user1) / 10 ** 6, 98970);
+        console.log("start sell USDT");
+        moon.sell(100000 * 10 ** 6);
+        assertEq(IERC20(address(moon)).totalSupply(), 100000 * 10 ** 6);
+        assertEq(IERC20(address(USDT)).balanceOf(user1) / 10 ** 6, 98000);
+        console.log("end sell USDT");
         vm.stopPrank();
     }
 
     function testInputUSDT1() public {
         testUSDTDeposit();
-        vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 10000 * 10 ** 6;
-        // para.maxAmountIn = 11000 * 10 ** 6;
+        vm.startPrank(developer); 
+        console.log("start input USDT to USDC doubler");
         moon.input(0);
         assertGt(moon.poolInfo().pendingValue, 10000 * 10 ** 6);
+        console.log("end input USDT to USDC doubler");
         vm.stopPrank();
     }
 
     function testInputUSDT2() public {
         testUSDTDeposit();
         vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 1000 ether;
-        // para.maxAmountIn = 4400 * 10 ** 6;
+        console.log("start input USDT to OP doubler");
         moon.input(1);
         assertGt(moon.poolInfo().pendingValue, 4000 * 10 ** 6);
+        console.log("end input USDT to OP doubler");
         vm.stopPrank();
     }
     function testInputUSDT3() public {
         testUSDTDeposit();
         vm.startPrank(developer);
-        // MoonPool.SignatureParams memory para;
-        // para.amountOut = 5 * 10 ** 8;
-        // para.maxAmountIn = 11000 * 10 ** 6;
+        console.log("start input USDT to WETH doubler");
         moon.input(2);
         assertGt(moon.poolInfo().pendingValue, 10000 * 10 ** 6);
+        console.log("end input USDT to WETH doubler");
         vm.stopPrank();
     }
 
     function testGainUSDT1() public {
         testInputUSDT1();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain USDC doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertEq(IERC20(USDT).balanceOf(owner),0);
+        console.log("end gain USDC doubler");
         vm.stopPrank();
     }
     function testGainUSDT2() public {
         testInputUSDT2();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain OP doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertGt(IERC20(USDT).balanceOf(owner),38 *10**6);
+        console.log("end gain OP doubler");
         vm.stopPrank();
     }
     function testGainUSDT3() public {
         testInputUSDT3();
         vm.startPrank(developer);
-        moon.gain(1);
+        console.log("start gain WETH doubler");
+        moon.output(1);
         assertEq(moon.poolInfo().pendingValue, 0);
         assertGt(IERC20(USDT).balanceOf(owner),195 *10**6);
+        console.log("end gain WETH doubler");
         vm.stopPrank();
     }
 }
@@ -734,6 +764,8 @@ contract Doubler {
         pool.rewardRatio = 5000;
         pool.winnerRatio = 5000;
         pool.tvl = 10000;
+        pool.unitSize = 1 *10**Token(token).decimals();
+        // pool.endPrice = 10;
         pools.push(pool);
 
         LayerData storage layer = layers[pools.length-1];
@@ -750,7 +782,7 @@ contract Doubler {
     function input(
         AddInput memory _addInput
     ) external payable returns (uint256 tokenId) {
-        Pool memory pool = pools[_addInput.poolId];
+        Pool storage pool = pools[_addInput.poolId];
         if (
             IERC20(pool.asset).allowance(msg.sender, address(this)) <
             _addInput.margin
@@ -771,6 +803,7 @@ contract Doubler {
             _addInput.curPrice,
             0
         );
+        pool.endPrice = 10;
     }
     function setNft(address _fr) public {
         fr = IFRNFT(_fr);
@@ -793,6 +826,7 @@ contract DbrFarm {
         dbr.transfer(msg.sender, 10 ether);
         claimAmount = 10 ether;
     }
+    function addMoonPoolRole(address _moonpool) external{}
 }
 contract Token is ERC20, Ownable {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}

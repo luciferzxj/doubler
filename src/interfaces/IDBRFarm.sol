@@ -33,14 +33,15 @@ interface IDBRFarm {
         uint256 endBlockNo;
     }
 
-    event Stacking(uint256 indexed tokenId, address depositor, uint256 addTvl);
+    event Staking(uint256 indexed tokenId, address depositor, uint256 addTvl);
     event EndDoubler(uint256 indexed doublerId, address from);
     event Claim(uint256 indexed doublerId, address to, uint256  tokenId, uint256 claimAmount);
     event UpdateEndReward(uint16 _newEndReward);
     event UpdateAssetPerBlock(address _asset, uint256 _perBlock);
     event Hot(uint256 doublerId, uint256 amount);
+    event Withdraw(uint256 _tokenId);
 
-    function stacking(uint256 _tokenId) external;
+    function staking(uint256 _tokenId) external;
     function claim(uint256 _tokenId) external;
     function withdraw(uint256 _tokenId) external;
     function join(uint256 _tokenId) external ;
@@ -53,6 +54,7 @@ interface IDBRFarm {
     function getTokenIds(address _user, uint256 _offset, uint256 _limit) external view  returns (uint256[] memory tokenIds);
     function getBoostPool() external view returns (ComPool memory);
     function getLastLayerRewardPool() external view returns (ComPool memory);
-    function getPrivateVar() external view returns(uint32 endReward, uint256 tvlTotal, address dbrAsset, address doubler, address frnft, address farmWallet);
+    function getPrivateVar() external view returns(uint256 tvlTotal, address dbrAsset, address doubler, address frnft, address farmWallet);
     function getTvlTotal() external view returns (uint256);
+    function addMoonPoolRole(address _moonpool) external ;
 }   

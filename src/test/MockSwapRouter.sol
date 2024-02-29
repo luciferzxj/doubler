@@ -8,8 +8,7 @@ import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/ISwapRouter.sol';
 import '../interfaces/IDBR.sol';
 
-contract MockSwapRouter is Context,ISwapRouter {
-
+contract MockSwapRouter is Context, ISwapRouter {
     function buy(
         address buyAsset,
         uint256 buyAmount,
@@ -30,5 +29,9 @@ contract MockSwapRouter is Context,ISwapRouter {
         IDBR(sellAseet).transferFrom(_msgSender(), address(this), sellAseetAmount);
         IDBR(returnAsset).mint(_msgSender(), returnAssetMax);
         return returnAssetMax;
+    }
+
+    function getSlippage() external view returns (uint256 slippage) {
+        return 80;
     }
 }

@@ -10,6 +10,8 @@ import '@openzeppelin/contracts/utils/math/SafeMath.sol';
 import './interfaces/IFRNFT.sol';
 import './interfaces/IDoubler.sol';
 import './interfaces/IDBRFarm.sol';
+import './interfaces/IMoonPool.sol';
+import './interfaces/IMoonPoolFactory.sol';
 import './interfaces/IDoublerHelper.sol';
 import './interfaces/IFastPriceFeed.sol';
 import 'hardhat/console.sol';
@@ -41,8 +43,10 @@ contract DoublerHelper is
     address private _FRNFT;
     address private _fastPriceFeed;
     address private _dbrFarm;
+    address private _mpFactory;
 
     address[] private _fastPriceTokens;
+    address[] private _moonPoolTokens;
 
     // for update
     function initialize() public initializer {
@@ -57,7 +61,8 @@ contract DoublerHelper is
         address _initDoublerAddress,
         address _initFRNFT,
         address _initFastPriceFeed,
-        address _initDbrFarm
+        address _initDbrFarm,
+        address _initMpFactory
     ) external onlyOwner {
         require(_initialized == false, 'initialized err');
         _initialized = true;
@@ -65,17 +70,32 @@ contract DoublerHelper is
         _FRNFT = _initFRNFT;
         _fastPriceFeed = _initFastPriceFeed;
         _dbrFarm = _initDbrFarm;
+        _mpFactory = _initMpFactory;
     }
 
     function updateFastPriceTokens(address[] calldata _initFastPriceTokens)  external onlyOwner {
       _fastPriceTokens = _initFastPriceTokens;
     }
 
-    function getTokens() external view returns (TokenMeta[] memory res) {
+    function updateMoonPoolPriceTokens(address[] calldata _initMoonPoolPriceTokens)  external onlyOwner {
+        _moonPoolTokens = _initMoonPoolPriceTokens;
+    }
+
+    function getDoublerAllowAssets() external view returns (TokenMeta[] memory res) {
         res = new TokenMeta[](_fastPriceTokens.length);
         for (uint i = 0; i < _fastPriceTokens.length; i++) {
             TokenMeta memory r = res[i];
             r.token = _fastPriceTokens[i];
+            r.decimals = IERC20Metadata(r.token).decimals();
+            r.symbol = IERC20Metadata(r.token).symbol();
+        }
+    }
+
+    function getMoonPoolAllowAssets() external view returns (TokenMeta[] memory res) {
+        res = new TokenMeta[](_moonPoolTokens.length);
+        for (uint i = 0; i < _moonPoolTokens.length; i++) {
+            TokenMeta memory r = res[i];
+            r.token = _moonPoolTokens[i];
             r.decimals = IERC20Metadata(r.token).decimals();
             r.symbol = IERC20Metadata(r.token).symbol();
         }
@@ -91,6 +111,9 @@ contract DoublerHelper is
         }
         if (keccak256(bytes(_updateType)) == keccak256(bytes('_dbrFarm'))) {
             _dbrFarm = _newAddr;
+        }
+        if (keccak256(bytes(_updateType)) == keccak256(bytes('mpFactory'))) {
+            _mpFactory = _newAddr;
         }
     }
 
@@ -217,4 +240,56 @@ contract DoublerHelper is
             nftView[i].doublerEnd = pool.endPrice > 0 ? true : false;
         }
     }
+
+    function userMoonPoolLpView(address from) external view returns(uint256 tvlTotal, UserLpView[] memory list){
+        IMoonPoolFactory mpf = IMoonPoolFactory(_mpFactory);
+        UserLpView memory lpv;
+        list = new UserLpView[](mpf.moonPoolTotal());
+        for (uint16 i =0; i < mpf.moonPoolTotal(); i ++) {
+            lpv.id = i +1;
+            lpv.addr = mpf.getMoonPoolAddress(lpv.id);
+            lpv.lpAmount = IERC20Metadata(lpv.addr).balanceOf(from);
+            lpv.price = IMoonPool(lpv.addr).getLPValue();
+            lpv.value = lpv.lpAmount * lpv.price / (10 ** IERC20Metadata(lpv.addr).decimals());
+            list[i] = lpv;
+            tvlTotal += lpv.value;
+        }
+    }
+
+    function getMoolPoolTvl() external view returns(uint256 tvl){
+        IMoonPoolFactory mpf = IMoonPoolFactory(_mpFactory);
+        address lpAddr;
+        IMoonPool.Pool memory pool;
+        for (uint16 i =0; i < mpf.moonPoolTotal(); i ++) {
+            lpAddr = mpf.getMoonPoolAddress(i+1);
+            pool = IMoonPool(lpAddr).poolInfo();
+            tvl += pool.pendingValue + IERC20Metadata(pool.asset).balanceOf(lpAddr);
+        }
+        return tvl;
+    }
+
+    function getMoolPoolList(uint128[] memory poolIds) external view returns(MoonPoolView[] memory pools){
+        IMoonPoolFactory mpf = IMoonPoolFactory(_mpFactory);
+        address lpAddr;
+        IMoonPool.Pool memory pool;
+        uint256 poolBlance;
+        pools = new MoonPoolView[](poolIds.length);
+        for (uint16 i =0; i < poolIds.length; i ++) {
+            lpAddr = mpf.getMoonPoolAddress(poolIds[i]);
+            pool = IMoonPool(lpAddr).poolInfo();
+            poolBlance = IERC20Metadata(pool.asset).balanceOf(lpAddr);
+            pools[i].id = poolIds[i];
+            pools[i].addr = lpAddr;
+            pools[i].asset = pool.asset;
+            pools[i].output = pool.output;
+            pools[i].input = pool.input;
+            pools[i].symbol = IERC20Metadata(pool.asset).symbol();
+            pools[i].tvl = pool.pendingValue + poolBlance;
+            pools[i].lpPrice = IMoonPool(lpAddr).getLPValue();
+            pools[i].buyLimit =  pools[i].tvl > pool.capMax ? 0 : pool.capMax - pools[i].tvl;
+            pools[i].sellLimit =  poolBlance > pools[i].tvl * pool.sellLimitCapRatio / RATIO_PRECISION ? poolBlance - pools[i].tvl * pool.sellLimitCapRatio / RATIO_PRECISION : 0;
+        }
+        return pools;
+    }
+
 }

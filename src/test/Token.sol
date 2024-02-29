@@ -14,6 +14,7 @@ contract Token is ERC20, ERC20Burnable, Pausable, AccessControlEnumerable {
     
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         _grantRole(MINT_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
 
     function mint(address to, uint256 amount) public onlyRole(MINT_ROLE)  {
