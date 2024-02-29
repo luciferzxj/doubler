@@ -35,8 +35,7 @@ contract DBRFarm is
     bool private _initialized;
     uint32 private constant RATIO_PRECISION = 10000;
     uint256 private constant MUl = 1e10;
-
-    uint32 private _endReward; // todo for remove
+    
     uint256 private _tvlTotal;
     address private _dbrAsset;
     address private _doubler;
@@ -74,7 +73,7 @@ contract DBRFarm is
         address _initFRNNFT,
         address _initMultiSigWallet,
         address _initFarmWallet,
-        address _initMoonPool,
+        address _initMoonPoolFactory,
         uint256 _initBoostPer,
         uint256 _initLastlayerPer
     ) external onlyRole(INIT_ROLE) {
@@ -88,18 +87,17 @@ contract DBRFarm is
         _lastLayerRewardPool.lastBlockNo = block.number;
         _lastLayerRewardPool.perBlock = _initLastlayerPer;
         _grantRole(DEFAULT_ADMIN_ROLE, _initMultiSigWallet);
+        _grantRole(DEFAULT_ADMIN_ROLE, _initMoonPoolFactory);
         _grantRole(DOUBLER_ROLE, _initDoubler);
-        _grantRole(MOONPOOL_ROLE, _initMoonPool);
-
         // for test to remove 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
-    
-    // function updateEndReward(uint16 _newEndReward) external nonReentrant onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     _endReward = _newEndReward;
-    //     emit UpdateEndReward(_newEndReward);
-    // }
 
+    function addMoonPoolRole(address _moonpool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+         _grantRole(MOONPOOL_ROLE, _moonpool);
+    }
+
+    
     function updateAssetPerBlock(address _asset, uint256 _perBlock) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateAssetPool(_asset);
         _assetPoolMap[_asset].perBlock = _perBlock;
@@ -115,21 +113,21 @@ contract DBRFarm is
         emit UpdateAssetPerBlock(_asset, _perBlock);
     }
 
-    function stacking(uint256 _tokenId) external nonReentrant {
+    function staking(uint256 _tokenId) external nonReentrant {
         require(IFRNFT(_FRNFT).ownerOf(_tokenId) == _msgSender(), 'owner err');
-        bool joined = _stacking(_tokenId);
+        bool joined = _staking(_tokenId);
         if (joined) {
             IFRNFT(_FRNFT).transferFrom(_msgSender(), address(this), _tokenId);
             _addTokenIdToPool(_msgSender(), _tokenId);
         }
     }
 
-    function batchStacking(uint256[] calldata _tokenIds) external nonReentrant {
+    function batchStaking(uint256[] calldata _tokenIds) external nonReentrant {
          uint256 tokenId ;
          for (uint i = 0; i < _tokenIds.length; ++i) {
             tokenId = _tokenIds[i];
             require(IFRNFT(_FRNFT).ownerOf(tokenId) == _msgSender(), 'owner err');
-            bool joined = _stacking(tokenId);
+            bool joined = _staking(tokenId);
             if (joined) {
                 IFRNFT(_FRNFT).transferFrom(_msgSender(), address(this), tokenId);
                 _addTokenIdToPool(_msgSender(), tokenId);
@@ -139,15 +137,18 @@ contract DBRFarm is
 
     function join(uint256 _tokenId) external onlyRole(MOONPOOL_ROLE) {
         require(IFRNFT(_FRNFT).ownerOf(_tokenId) == _msgSender(), 'owner err');
-        _stacking(_tokenId);
+        _staking(_tokenId);
     }
 
     function left(uint256 _tokenId) external onlyRole(MOONPOOL_ROLE) returns(uint256 claimAmount) {
         require(IFRNFT(_FRNFT).ownerOf(_tokenId) == _msgSender(), 'owner err');
+        if (_depositrMap[_tokenId].from != _msgSender()) {
+            return 0;
+        }
         claimAmount = _claimToken(_tokenId, true);
     }
 
-    function _stacking(uint256 _tokenId) internal returns(bool){
+    function _staking(uint256 _tokenId) internal returns(bool){
         IFRNFT.Traits memory nft = IFRNFT(_FRNFT).getTraits(_tokenId);
         IDoubler.Pool memory pool = IDoubler(_doubler).getPool(nft.poolId);
         require(pool.endPrice == 0, 'doubler end err');
@@ -161,7 +162,7 @@ contract DBRFarm is
         _depositrMap[_tokenId].lastPerShare = _assetPoolMap[pool.asset].perShareTotal;
         _depositrMap[_tokenId].from = _msgSender();
         _tvlTotal += addTvl;
-        emit Stacking(_tokenId, _msgSender(), addTvl);
+        emit Staking(_tokenId, _msgSender(), addTvl);
         return true;
     }
 
@@ -211,10 +212,11 @@ contract DBRFarm is
             }
             _depositrMap[_tokenId].endClaim = true;
         }
+        // ensure tokenid withdraw
+        claimAmount = claimAmount.div(MUl) >  IERC20(_dbrAsset).balanceOf(_farmWallet) ?  IERC20(_dbrAsset).balanceOf(_farmWallet) : claimAmount.div(MUl);
         if (claimAmount >0) {
-            _depositrMap[_tokenId].sendTotal += claimAmount;
-            require(IERC20(_dbrAsset).balanceOf(_farmWallet) >= claimAmount.div(MUl), 'farmWallet balance error');
-            IERC20(_dbrAsset).safeTransferFrom(_farmWallet, _msgSender(),  claimAmount.div(MUl));
+            _depositrMap[_tokenId].sendTotal += claimAmount.mul(MUl);
+            IERC20(_dbrAsset).safeTransferFrom(_farmWallet, _msgSender(),  claimAmount);
         }
         emit Claim(nft.poolId, _msgSender(), _tokenId, claimAmount);
     }
@@ -225,6 +227,7 @@ contract DBRFarm is
         _claimToken(_tokenId, true);
         IFRNFT(_FRNFT).transferFrom(address(this), _msgSender(), _tokenId);
         _removeTokenIdFromPool(_msgSender(), _tokenId);
+        emit Withdraw(_tokenId);
     }
 
     function getNftPendingTotal(uint256 _tokenId) external view returns (uint256 peending, uint256 boostReward, uint256 lastLayerReward) {
@@ -375,9 +378,8 @@ contract DBRFarm is
         return _tvlTotal;
     }
     
-    // todo for update
-    function getPrivateVar() external view returns(uint32 endReward, uint256 tvlTotal, address dbrAsset, address doubler, address frnft, address farmWallet){
-        return (_endReward ,_tvlTotal , _dbrAsset, _doubler, _FRNFT, _farmWallet);
+    function getPrivateVar() external view returns(uint256 tvlTotal, address dbrAsset, address doubler, address frnft, address farmWallet){
+        return (_tvlTotal , _dbrAsset, _doubler, _FRNFT, _farmWallet);
     }
 
 }

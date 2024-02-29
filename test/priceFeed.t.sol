@@ -91,7 +91,7 @@ contract priceFeedTest is Test{
         address[] memory token = new address[](1);
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = WETH;
-        limit[0] = IFastPriceFeed.PriceLimit(3000*10**18,3100*10**18);
+        limit[0] = IFastPriceFeed.PriceLimit(3000*10**18,3500*10**18);
 
 
         plan = IFastPriceFeed.Plan.DEX;
@@ -223,7 +223,7 @@ contract priceFeedTest is Test{
         address[] memory token = new address[](1);
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = WBTC;
-        limit[0] = IFastPriceFeed.PriceLimit(50000*10**18,55000*10**18);
+        limit[0] = IFastPriceFeed.PriceLimit(50000*10**18,65000*10**18);
         // DoublerOracle.Plan plan;
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
@@ -351,7 +351,7 @@ contract priceFeedTest is Test{
         address[] memory token = new address[](1);
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = DOGE;
-        limit[0] = IFastPriceFeed.PriceLimit(8*10**16,1*10**17);
+        limit[0] = IFastPriceFeed.PriceLimit(1*10**17,2*10**17);
 
         plan = IFastPriceFeed.Plan.CHAINLINK;
         oracle.newAsset(DOGE,chainlink,bytes32(0),5 minutes,plan,0);

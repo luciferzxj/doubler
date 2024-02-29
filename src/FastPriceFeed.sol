@@ -194,6 +194,7 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
     mapping(address =>address) internal _pythAssetMap;
     mapping(address =>uint256) internal _pythAssetTime;
 
+
     constructor(address _initMultiSigWallet) {
         _grantRole(DEFAULT_ADMIN_ROLE, _initMultiSigWallet);
     }
@@ -203,7 +204,7 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         _;
     }
 
-     function initPyhonPriceFeed(address _asset, address _oracleAddr,  bytes32 priceId,uint256 timelimit) internal {
+     function initPyhonPriceFeed(address _asset, address _oracleAddr,  bytes32 priceId, uint256 timelimit) internal {
         _pythAssetPriceIdMap[_asset] = priceId;
         _pythAssetMap[_asset]   = _oracleAddr;
         _pythAssetTime[_asset] = timelimit;
@@ -382,20 +383,14 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         Plan pl = _plans[_asset];
         if (pl == Plan.CHAINLINK) {
             price = getLastedDataFromChainlink(_asset);
-            if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
-                revert();
-            } 
          } else if (pl == Plan.PYTH) {
             price = getPytPrice(_asset);
-            if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
-                revert();
-            }
         } else if (pl == Plan.DEX) {
             price = getPriceFromDex(_asset);
-            if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
-                revert();
-            }
         } else if (_plans[_asset] == Plan.OTHER) {
+            revert();
+        }
+        if(price < _priceLimits[_asset].min || price > _priceLimits[_asset].max) {
             revert();
         }
     }

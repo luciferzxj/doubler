@@ -1,5 +1,6 @@
 pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "forge-std/Test.sol";
 contract UniV2Router {
     mapping(address => mapping(address => address)) public getPair;
     function sortTokens(
@@ -400,6 +401,7 @@ contract swapRouter {
             path[2] = token3;
         }
         uint256[] memory amounts = getAmountsIn(params.amountOut, path);
+        // console.log(amounts[0]);
         require(
             amounts[0] <= params.amountInMaximum,
             "UniswapV2Router: EXCESSIVE_INPUT_AMOUNT"

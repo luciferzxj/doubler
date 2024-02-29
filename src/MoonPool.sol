@@ -18,6 +18,7 @@ import './interfaces/IMoonPool.sol';
 import './interfaces/IDBRFarm.sol';
 import './interfaces/ISwapRouter.sol';
 import './interfaces/IWETH.sol';
+// import 'hardhat/console.sol';
 
 contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
 
@@ -26,49 +27,33 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
     using Strings for uint32;
 
     uint256 private constant RATIO_PRECISION = 10000; // 100 * 100
-    
     uint256 private constant FEE = 200;
     uint256 private constant SCAN = 1e18;
-    uint256 private constant END_LIMIT = 30 days;
-    uint256 private constant FALL_RADIO_MIN = 10;
-    uint256 private constant FALL_RADIO_MAX = 2000;
-    uint256 private constant KEEPER_REWARD_PRECENT = 100;
     uint256 private constant CREATOR_REWARD_MAX = 2000;
-    uint256 private constant PRICE_PRECISION_MAX = 11000;
-    uint256 private constant PRICE_PRECISION_MIN = 9500;
-
-    uint256 private _creatorRewardRatio;
+    
     address private _factory;
-    PoolConfig private _poolCfg;
-    Pool private _pool;
-    // map(doublerId => map(asset => InputRule))
+    // map(asset => InputRule)
     mapping(address => InputRule) private _ruleMap;
-    // map(doublerId => map(tokenId => Bill))
+    // map(tokenId => Bill)
     mapping(uint256 => InputRecord) private _inputRecord;
-    // map(hash => bool) ; hash = keccak256(abi.encodePacked(pooid + doublerId + doublerLayer)）
-    mapping(bytes32 => bool) private _inputLayer;
 
-    mapping(bytes32 => bool) private _usedSignature;
-
-    mapping(address => uint256) private tokenBal;
-
-    uint256 public tokenMuch;
-
+    Pool private _pool;
+    
     constructor( string memory _name,   string memory _symbol, 
-        PoolConfig memory _initPoolCfg, InputRule[] memory _rules, 
-        uint256 _duration, uint256 _cap,uint256 _initAmount, uint256 _rewardRatio) ERC20(_name, _symbol) {
-        if (_duration > END_LIMIT) revert E_duration();
+        Pool memory _initPool, InputRule[] memory _rules, 
+        uint256 _duration, uint256 _cap,uint256 _initAmount) ERC20(_name, _symbol) {
+        if (_duration < 1 days) revert E_duration();
         if (_cap < _initAmount) revert E_cap();
-        if (_rewardRatio > CREATOR_REWARD_MAX) revert E_rewardRatio();
+        if (_initPool.creatorRewardRatio > CREATOR_REWARD_MAX) revert E_rewardRatio();
         // init some
         _factory = _msgSender();
-        _poolCfg = _initPoolCfg;
-        _creatorRewardRatio = _rewardRatio;
+        _pool = _initPool;
+        // _creatorRewardRatio = _initCreatorRewardRatio;
         _pool.endTime   = block.timestamp + _duration;
         _pool.capMax    = _cap;
         // init rule
         InputRule memory ir;
-        IDoubler doubler = IDoubler(_poolCfg.doubler);
+        IDoubler doubler = IDoubler(_pool.doubler);
         for (uint32 i = 0; i < _rules.length; ++i) {
             ir = _rules[i];
             if (!doubler.getAssetConfigMap(ir.asset).isOpen) revert E_asset();
@@ -89,10 +74,6 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
             );
         }
     }
-    
-    function poolConfig() external view returns (PoolConfig memory cfg) {
-        return _poolCfg;
-    }
 
     function ruleMap(address _asset) external view returns (InputRule memory rule) {
         return _ruleMap[_asset];
@@ -111,22 +92,20 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
     }
 
     function ruleCheck(InputRule memory _ir) internal pure {
-        if (_ir.fallRatioMin < FALL_RADIO_MIN || _ir.fallRatioMax > FALL_RADIO_MAX) revert E_fallRatio();
-        if (_ir.profitRatioMin < 50 || _ir.profitRatioMax > RATIO_PRECISION) revert E_profitRatio();
-        if (_ir.rewardRatioMax > RATIO_PRECISION) revert E_rewardRatioMax();
-        if (_ir.winnerRatioMax > RATIO_PRECISION) revert E_winnerRatioMax();
+        if (_ir.fallRatioMin > _ir.fallRatioMax || _ir.fallRatioMin < 50 || _ir.fallRatioMax >= 8000) revert E_fallRatio();
+        if (_ir.profitRatioMin >  _ir.profitRatioMax || _ir.profitRatioMin < 50 || _ir.profitRatioMax > RATIO_PRECISION) revert E_profitRatio();
+        if (_ir.rewardRatioMax > RATIO_PRECISION || _ir.rewardRatioMin > _ir.rewardRatioMax) revert E_rewardRatioMax();
+        if (_ir.winnerRatioMax > RATIO_PRECISION || _ir.winnerRatioMin > _ir.winnerRatioMax) revert E_winnerRatioMax();
         if (_ir.tvl == 0) revert E_tvl();
-         // require(_ir.layerInputMax > 100, 'layerInputMax err');
+        if (_ir.layerInputMax == 0) revert E_layerInput();
     }
 
     function updateRule(InputRule calldata _ir) external nonReentrant {
-        if (_poolCfg.creator == _msgSender()) revert E_creator();
-        if (_ir.fallRatioMin < FALL_RADIO_MIN || _ir.fallRatioMax > FALL_RADIO_MAX) revert E_fallRatio();
+        if (_pool.creator != _msgSender()) revert E_creator();
         if (_ruleMap[_ir.asset].asset == address(0x0)) revert E_asset();
-        // todo for update some ?
         InputRule storage ir = _ruleMap[_ir.asset];
-        ir.fallRatioMin = _ir.fallRatioMin;
-        ir.fallRatioMax = _ir.fallRatioMax;
+        ir.tvl = _ir.tvl;
+        ir.layerInputMax = _ir.layerInputMax;
         emit UpdateInputRule(
             ir.asset,
             ir.fallRatioMin,
@@ -147,12 +126,16 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
         _buy(_amount, _to);
     }
 
+    function getLPValue () external view returns (uint256) {
+        return _getLPValue();
+    }
+
     function _getLPValue() internal view returns (uint256) {
         uint256 lpTotal = totalSupply();
         if (lpTotal == 0) {
             return 10 ** decimals();
         }
-        uint256 valueTotal = IERC20(_poolCfg.asset).balanceOf(address(this)) + _pool.pendingValue;
+        uint256 valueTotal = IERC20(_pool.asset).balanceOf(address(this)) + _pool.pendingValue;
         return (valueTotal * SCAN) / lpTotal;
     }
 
@@ -166,26 +149,24 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
         if (lpTotal == 0) {
             return 10 ** decimals();
         }
-        uint256 valueTotal = IERC20(_poolCfg.asset).balanceOf(address(this)) + _pool.pendingValue;
+        uint256 valueTotal = IERC20(_pool.asset).balanceOf(address(this)) + _pool.pendingValue;
         return (lpTotal * SCAN) / valueTotal;
     }
 
     function _buy(uint256 _amount, address _to) internal returns(uint256 _lpAmount)  {
-        if (IERC20(_poolCfg.asset).balanceOf(address(this)) + _pool.pendingValue + _amount > _pool.capMax) revert E_cap();
-        // lower 20% and reward 
+        if (IERC20(_pool.asset).balanceOf(address(this)) + _pool.pendingValue + _amount > _pool.capMax) revert E_cap();
         uint256 extra;
-        if (IERC20(_poolCfg.asset).balanceOf(address(this)) < _pool.capMax / 5) {
-            extra =(
-                    _pool.capMax / 5 - IERC20(_poolCfg.asset).balanceOf(address(this)) > _amount
-                        ? _amount
-                        : _pool.capMax / 5 - IERC20(_poolCfg.asset).balanceOf(address(this))
-                   ) * 2 /100;
+         // lower  then reward 
+        uint256 mpBalance = IERC20(_pool.asset).balanceOf(address(this));
+        uint256 trigerReward = (IERC20(_pool.asset).balanceOf(address(this))  + _pool.pendingValue) * _pool.triggerRewardRatio /  RATIO_PRECISION;
+        if (totalSupply() > 0 && mpBalance  < trigerReward ) {
+            extra = (trigerReward - mpBalance > _amount ? _amount : trigerReward - mpBalance)* 2 /100;
         }
         uint256 uValue = _getUValue();
-        IERC20(_poolCfg.asset).safeTransferFrom(_msgSender(), address(this), _amount);
         _lpAmount = (uValue * (_amount + extra)) / SCAN;
+        IERC20(_pool.asset).safeTransferFrom(_msgSender(), address(this), _amount);
         _mint(_to, _lpAmount);
-        emit Buy(_to, _lpAmount, _amount);
+        emit Buy(_to, _lpAmount, _amount, IERC20(_pool.asset).balanceOf(address(this)), _pool.pendingValue, _getLPValue());
         return _lpAmount;
     }
 
@@ -193,22 +174,24 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
         uint256 lpValue = _getLPValue();
         uint256 dbrValue = _getLPDbrValue();
         uint256 sendUAmount = (_lpAmount * lpValue) / SCAN;
-        sendUAmount = sendUAmount > IERC20(_poolCfg.asset).balanceOf(address(this))
-            ? IERC20(_poolCfg.asset).balanceOf(address(this))
-            : sendUAmount;
+        if (balanceOf(_msgSender()) < _lpAmount) revert E_balance();
+        // if (allowance(_msgSender(), address(this)) < _lpAmount) revert E_Approve();
+        uint256 mpBalance = IERC20(_pool.asset).balanceOf(address(this));
+        if (sendUAmount > mpBalance) revert E_balance();
         if (block.timestamp < _pool.endTime) {
-            // sell limit 50% of cap
-            if (IERC20(_poolCfg.asset).balanceOf(address(this)) - sendUAmount < _pool.pendingValue) revert E_sell_limit();
+            if (mpBalance <  (mpBalance + _pool.pendingValue) * _pool.sellLimitCapRatio / RATIO_PRECISION)  revert E_sell_limit();
+            if (mpBalance - (mpBalance + _pool.pendingValue) * _pool.sellLimitCapRatio / RATIO_PRECISION < sendUAmount) revert E_sell_limit();
+            // if ((mpBalance - sendUAmount) * RATIO_PRECISION / (mpBalance + _pool.pendingValue - sendUAmount) < _pool.sellLimitCapRatio) revert E_sell_limit();
         }
         _burn(_msgSender(), _lpAmount);
         uint256 fee = (sendUAmount * FEE) / RATIO_PRECISION;
-        IERC20(_poolCfg.asset).safeTransfer(_msgSender(), sendUAmount - fee);
-        IERC20(_poolCfg.asset).safeTransfer(_poolCfg.eco, fee);
+        IERC20(_pool.asset).safeTransfer(_msgSender(), sendUAmount - fee);
+        IERC20(_pool.asset).safeTransfer(_pool.eco, fee);
         uint256 dbrAmount = (_lpAmount * dbrValue) / SCAN;
         dbrAmount = dbrAmount > _pool.dbrAmount ? _pool.dbrAmount : dbrAmount;
         _pool.dbrAmount -= dbrAmount;
-        IERC20(_poolCfg.dbr).safeTransfer(_msgSender(), dbrAmount);
-        emit Sell(_msgSender(), _lpAmount, sendUAmount - fee, fee, dbrAmount);
+        IERC20(_pool.dbr).safeTransfer(_msgSender(), dbrAmount);
+        emit Sell(_msgSender(), _lpAmount, sendUAmount, fee, dbrAmount, IERC20(_pool.asset).balanceOf(address(this)), _pool.pendingValue, _getLPValue());
         return (sendUAmount - fee);
     }
 
@@ -233,81 +216,92 @@ contract MoonPool is IMoonPool, ERC20, ReentrancyGuard {
     }
 
     function input(uint256 _doublerId) external nonReentrant {
-        if (block.timestamp >  _pool.endTime) revert E_pool_end();
-        IDoubler.Pool memory doubler = IDoubler(_poolCfg.doubler).getPool(_doublerId);
+        IDoubler.Pool memory doubler = IDoubler(_pool.doubler).getPool(_doublerId);
+        if (block.timestamp >  _pool.endTime || doubler.endPrice > 0) revert E_pool_end();
         if (!checkDoubler(doubler)) revert E_pool_check();
-        uint256 decimal1 = 1*10**IERC20Metadata(_poolCfg.asset).decimals();
-        uint256 decimal2 = 1*10**IERC20Metadata(doubler.asset).decimals();
         InputRule memory rule = _ruleMap[doubler.asset];
-        uint256 price = IFastPriceFeed(_poolCfg.priceFeed).getPrice(doubler.asset);
-        IDoubler.LayerData memory layer = IDoubler(_poolCfg.doubler).getLayerData(_doublerId, doubler.lastLayer);
+        uint256 price = IFastPriceFeed(_pool.priceFeed).getPrice(doubler.asset);
+        IDoubler.LayerData memory layer = IDoubler(_pool.doubler).getLayerData(_doublerId, doubler.lastLayer);
         uint256 margin = layer.cap - layer.amount;
-        uint256 marginUValue = margin * price*decimal1 / 1e18/decimal2;
 
-        uint256 poolUBalace = IERC20(_poolCfg.asset).balanceOf(address(this));
-        uint256 spendAmount = poolUBalace >  rule.layerInputMax ?  rule.layerInputMax: poolUBalace;
-        // todo for some improve
-        if (marginUValue > spendAmount) {
-           uint256 units = (spendAmount / price * 1e18) % doubler.unitSize;
-           margin = units * doubler.unitSize;
+        // new layer
+        if (margin == 0) {
+            uint256 lastClosePrice = doubler.lastOpenPrice * (RATIO_PRECISION-doubler.fallRatio) / (RATIO_PRECISION);
+            if (price > lastClosePrice) revert E_layer_close();
+            //use lastLayer cap
+            if (doubler.kTotal >= 49) {
+                 margin = layer.cap;
+            } else {
+                 uint256 k = (doubler.lastOpenPrice-price) * RATIO_PRECISION/ doubler.fallRatio /doubler.lastOpenPrice;
+                 uint256 n = doubler.kTotal + k > 49 ? 49 - doubler.kTotal : k;
+                 uint256 doubleV2 = doubler.double;
+                 layer = IDoubler(_pool.doubler).getLayerData(_doublerId, doubler.lastLayer);
+                 margin = layer.cap * (doubleV2 ** n);
+            }
         }
-        spendAmount = marginUValue*PRICE_PRECISION_MAX/RATIO_PRECISION;
-        IERC20(_poolCfg.asset).approve(_poolCfg.swapRouter,spendAmount);
-        spendAmount = ISwapRouter(_poolCfg.swapRouter).buy(_poolCfg.asset, margin, doubler.asset, spendAmount);
-        IERC20(doubler.asset).approve(_poolCfg.doubler,margin);
-        _input(spendAmount, margin, _doublerId);
 
-        // todo send dbr??
-        // uint256 sendDbrAmount = (_pool.dbrAmount * KEEPER_REWARD_PRECENT) / RATIO_PRECISION;
-        // IERC20(_poolCfg.dbr).safeTransferFrom(address(this), _msgSender(), sendDbrAmount);
+        uint256 mpBalance = IERC20(_pool.asset).balanceOf(address(this));
+        uint8  decimals = IERC20Metadata(_pool.asset).decimals();
+        uint8  decimals2 = IERC20Metadata(doubler.asset).decimals();
+        uint256 spendAmount = mpBalance >  rule.layerInputMax ?  rule.layerInputMax : mpBalance;
+        uint256 units = (spendAmount * SCAN * 10 ** decimals2  * RATIO_PRECISION + _getSlippage() / (RATIO_PRECISION) / price / 10**decimals);  
+        margin = margin > units ? units : margin;
+        if (price * doubler.unitSize * (10 ** decimals)/SCAN/(10 ** decimals2) > rule.layerInputMax) revert E_input_max();
+        spendAmount = margin * price * 10**decimals * (RATIO_PRECISION + _getSlippage()) / RATIO_PRECISION / SCAN /10**decimals2;
+        IERC20(_pool.asset).approve(_pool.swapRouter, spendAmount);
+        spendAmount = ISwapRouter(_pool.swapRouter).buy(_pool.asset, margin, doubler.asset, spendAmount);
+        IERC20(doubler.asset).approve(_pool.doubler, margin);
+        
+        uint256 tokenId = _input(spendAmount, margin, _doublerId);
+        emit CostBill(_doublerId, tokenId, 1, spendAmount, 0,  0, IERC20(_pool.asset).balanceOf(address(this)), _pool.pendingValue, _getLPValue());
     }
 
     function _input(
         uint256 _spendAmount,
         uint256 _margin,
         uint256 _doublerId
-    ) internal {
+    ) internal returns (uint256 tokenId){
         IDoubler.AddInput memory addInput;
         addInput.poolId = _doublerId;
         addInput.margin = _margin;
         addInput.multiple = 1;
         addInput.amount = _margin;
-        uint256 tokenId = IDoubler(_poolCfg.doubler).input(addInput);
+        tokenId = IDoubler(_pool.doubler).input(addInput);
         _pool.pendingValue += _spendAmount;
         _inputRecord[tokenId].spend = _spendAmount;
-        IDBRFarm(_poolCfg.dbrFarm).join(tokenId);
+        IDBRFarm(_pool.dbrFarm).join(tokenId);
     }
 
-    function gain(uint256 _tokenId) external nonReentrant {
-        
-        IDoubler.Pool memory doubler = IDoubler(_poolCfg.doubler).getPool(
-            IFRNFT(_poolCfg.frnft).getTraits(_tokenId).poolId
-        );
+    function _getSlippage() internal view returns(uint256) {
+        return ISwapRouter(_pool.swapRouter).getSlippage();
+    }
 
-        uint256 mintDbr = IDBRFarm(_poolCfg.dbrFarm).left(_tokenId);
-        uint256 amount = IDoubler(_poolCfg.doubler).gain(_tokenId);
-        uint256 decimal1 = 1*10**IERC20Metadata(_poolCfg.asset).decimals();
-        uint256 decimal2 = 1*10**IERC20Metadata(doubler.asset).decimals();
-
-        uint256 price = IFastPriceFeed(_poolCfg.priceFeed).getPrice(doubler.asset);
-        uint256 returnAmount =  amount * price *PRICE_PRECISION_MIN*decimal1 / 1e18/RATIO_PRECISION/decimal2;
-        IERC20(doubler.asset).approve(_poolCfg.swapRouter,amount);
-        returnAmount = ISwapRouter(_poolCfg.swapRouter).sell(doubler.asset, amount, _poolCfg.asset, returnAmount);
-
+    function output(uint256 _tokenId) external nonReentrant {
+        uint256 doublerId = IFRNFT(_pool.frnft).getTraits(_tokenId).poolId;
+        IDoubler.Pool memory doubler = IDoubler(_pool.doubler).getPool(doublerId);
+        if (doubler.endPrice == 0) revert E_pool_end();
+        uint256 mintDbr = IDBRFarm(_pool.dbrFarm).left(_tokenId);
+        IFRNFT(_pool.frnft).approve(_pool.doubler, _tokenId);
+        uint256 amount = IDoubler(_pool.doubler).gain(_tokenId);
+        uint256 price = IFastPriceFeed(_pool.priceFeed).getPrice(doubler.asset);
+        uint8  decimals = IERC20Metadata(_pool.asset).decimals();
+        uint8  decimals2 = IERC20Metadata(doubler.asset).decimals();
+        uint256 returnAmount =  amount * price * 10** decimals * (RATIO_PRECISION - _getSlippage()) /SCAN/ (10 ** decimals2) / RATIO_PRECISION;
+        IERC20(doubler.asset).approve(_pool.swapRouter, amount);
+        returnAmount = ISwapRouter(_pool.swapRouter).sell(doubler.asset, amount, _pool.asset, returnAmount);
         InputRecord storage record = _inputRecord[_tokenId];
-        record.income = returnAmount;
-        
         _pool.pendingValue -= record.spend;
         _pool.dbrAmount += mintDbr;
         _pool.output += record.spend;
-        _pool.input += record.income;
-
+        // profit part for creator reward
         if (returnAmount > record.spend) {
-            IERC20(_poolCfg.asset).transfer(
-                _poolCfg.creator,
-                ((returnAmount - record.spend) * _creatorRewardRatio) / RATIO_PRECISION
-            );
+            uint256 creatorReward =  (returnAmount - record.spend) * _pool.creatorRewardRatio / RATIO_PRECISION;
+            IERC20(_pool.asset).transfer(_pool.creator, creatorReward);
+            returnAmount = returnAmount - creatorReward;
         }
-        emit Gain(_tokenId, record.spend, returnAmount, mintDbr);
+        record.income = returnAmount;
+        _pool.input += returnAmount;
+        emit CostBill(doublerId, _tokenId, 2, record.spend, record.income, mintDbr, IERC20(_pool.asset).balanceOf(address(this)), _pool.pendingValue, _getLPValue());
     }
+
 }

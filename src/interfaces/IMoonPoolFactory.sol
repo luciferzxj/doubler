@@ -8,6 +8,8 @@ interface IMoonPoolFactory {
 
     error E_asset(); 
     error E_initAmount();
+    error E_sellLimit();
+    error E_triggerReward();
 
     struct BaseConfig {
         address eco; // eco system
@@ -19,22 +21,28 @@ interface IMoonPoolFactory {
         address swapRouter;
     }
 
+    struct AddMoonPool {
+        address srcAsset;
+        uint256 duration;
+        uint256 cap;
+        uint256 initAmount;
+        uint16  creatorRewardRatio;
+        uint16  triggerRewardRatio;
+        uint16  sellLimitCapRatio;
+    }
+    
     event UpdateAsset(address asset , bool isSupported);
 
     event CreateMoonPool(uint256 poolId, address moonPool, address asset, uint256 duration, uint256 cap, uint256 initAmount, uint256 rewardRatio);
 
     function baseConfig() external view returns (BaseConfig memory);
 
-    function moonPools() external view returns (address[] memory _pools);
+    function moonPoolTotal() external view returns (uint256);
     
-    function moonPool(uint128 _pooId) external view returns (address);
+    function getMoonPoolAddress(uint128 _pooId) external view returns (address);
 
     function createMoonPool(
-        address _srcAsset,
-        IMoonPool.InputRule[] calldata _rules,
-        uint256 _duration,
-        uint256 _cap,
-        uint256 _initAmount,
-        uint256 _rewardRatio
-    ) external ;
+        AddMoonPool calldata _addPool,
+        IMoonPool.InputRule[] calldata _rules
+    ) external;
 }

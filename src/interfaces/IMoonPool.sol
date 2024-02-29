@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
+// import './IOneInch.sol';
 
 interface IMoonPool {
 
@@ -18,18 +19,36 @@ interface IMoonPool {
     error E_creator();
     error E_asset();
     error E_poolend();
+    error E_layerInput();
+    error E_balance();
+    error E_layer_close();
+    error E_Approve();
+    error E_input_max();
+    
     
     struct Pool {
-        uint256 pendingValue; // 
+        // config 
+        uint16 creatorRewardRatio;
+        uint16 triggerRewardRatio;
+        uint16 sellLimitCapRatio;
+        address creator;
+        address eco;
+        address asset;
+        address doubler;
+        address dbr;
+        address dbrFarm;
+        address frnft;
+        address priceFeed;
+        address swapRouter;
+        // update value
+        uint256 pendingValue; 
         uint256 output;
         uint256 input;
         uint256 capMax;
         uint256 dbrAmount;
-        // uint256 startTime;
         uint256 endTime;
     }
 
-    // map (pooId => map(asset => InputRule))
     struct InputRule {
         address asset;
         uint16 fallRatioMin;
@@ -42,30 +61,18 @@ interface IMoonPool {
         uint16 winnerRatioMax;
         uint256 tvl;
         uint256 layerInputMax;
+        // uint24 fee;
     }
 
-    // map(pooId => map(tokenId => Bill))
     struct InputRecord {
         bool isWithdraw;
         uint256 spend;
         uint256 income;
     }
 
-    struct PoolConfig {
-        address creator;
-        address eco;
-        address asset;
-        address doubler;
-        address dbr;
-        address dbrFarm;
-        address frnft;
-        address priceFeed;
-        address swapRouter;
-    }
+    event Buy(address user, uint256 lpAmount, uint256 spendAmount, uint256 balance, uint256 pending,  uint256 lpPrice);
 
-    event Buy(address user, uint256 lpAmount, uint256 spendAmount);
-
-    event Sell(address user, uint256 lpAmount, uint256 uAmount, uint256 fee,  uint256 dbrAmount);
+    event Sell(address user, uint256 lpAmount, uint256 uAmount, uint256 fee,  uint256 dbrAmount, uint256 balance, uint256 pending,  uint256 lpPrice);
 
     event UpdateInputRule(
         address asset,
@@ -80,19 +87,8 @@ interface IMoonPool {
         uint256 tvl,
         uint256 layerInputMax
     );
-
-    event NewInput(
-        uint256 indexed doublerId,
-        uint256 lastLayer,
-        uint256 tokenId,
-        uint256 spentAmount,
-        uint256 inputAmount
-    );
-
-    event NftBill(uint256 indexed doublerId, uint256  indexed tokenId, uint256 output,  uint256 input,  uint256 dbr);
-
-    event Gain(uint256 tokenId, uint256 spend, uint256 uSell, uint256 mintDbr);
-
+    
+    event CostBill(uint256 indexed doublerId, uint256  indexed tokenId, uint8 billType,  uint256 output,  uint256 input, uint256 dbr, uint256 balance, uint256 pending,  uint256 lpPrice);
 
     function updateRule(InputRule calldata _inputRule) external;
 
@@ -101,8 +97,8 @@ interface IMoonPool {
     function sell(uint256 _lpAmount)  external returns(uint256 uAmount) ;
 
     function input(uint256 _doublerId) external;
-
-    function gain(uint256 _tokenId) external;
+    
+    function output(uint256 _tokenId) external;
 
     function getFactory() external view returns (address);
 
@@ -112,5 +108,5 @@ interface IMoonPool {
     
     function ruleMap(address _asset) external view returns (InputRule memory rule);
 
-    function tokenMuch() external view returns (uint256);
+    function getLPValue () external view returns (uint256);
 }
