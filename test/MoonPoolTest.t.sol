@@ -173,7 +173,7 @@ contract MoonTest is Test {
         tokens[5] = WETH;
         doubler = new Doubler(tokens);
         fr = new FRNFT("FRNFT", "FR");
-        doubler.setNft(address(fr));
+        doubler.setNft(address(fr),address(priceFeed));
         dbr = new Token("DBR", "D");
         dbrFarm = address(new DbrFarm(address(dbr)));
         Aggregator.RouterConfig memory temp;
@@ -739,6 +739,7 @@ contract Doubler {
     address constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     Pool[] pools;
     IFRNFT fr;
+    FastPriceFeedTest feed;
     function getAssetConfigMap(
         address token
     ) public view returns (Asset memory) {
@@ -794,19 +795,21 @@ contract Doubler {
             address(this),
             _addInput.margin
         );
+        uint256 curPrice = feed.getPrice(pool.asset);
         tokenId = fr.mint(
             msg.sender,
             _addInput.poolId,
             _addInput.layer,
             _addInput.margin,
             _addInput.amount,
-            _addInput.curPrice,
+            curPrice,
             0
         );
         pool.endPrice = 10;
     }
-    function setNft(address _fr) public {
+    function setNft(address _fr,address priceFeed) public {
         fr = IFRNFT(_fr);
+        feed = FastPriceFeedTest(priceFeed);
     }
     function gain(uint256 _tokenId) external returns (uint256 amount) {
         FRNFT.Traits memory nft = fr.getTraits(_tokenId);

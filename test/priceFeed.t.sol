@@ -91,7 +91,7 @@ contract priceFeedTest is Test{
         address[] memory token = new address[](1);
         IFastPriceFeed.PriceLimit[] memory limit = new IFastPriceFeed.PriceLimit[](1);
         token[0] = WETH;
-        limit[0] = IFastPriceFeed.PriceLimit(3000*10**18,3500*10**18);
+        limit[0] = IFastPriceFeed.PriceLimit(3200*10**18,3800*10**18);
 
 
         plan = IFastPriceFeed.Plan.DEX;
