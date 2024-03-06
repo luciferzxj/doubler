@@ -269,6 +269,10 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         _plans[_asset] = _plan;
         if (_plan == Plan.DEX) {
             initDexPriceFeed(_asset, _assetPriceFeed);
+            require(
+                MAX_INTERVA >= _twapInterval && _twapInterval >= MIN_INTERVA,
+                'setTwapInterval: Invalid twapInterval'
+            );
             _twapIntervals[_asset] = _twapInterval;
         } else if (_plan == Plan.PYTH) {
             initPyhonPriceFeed(_asset, _assetPriceFeed, _assetPriceId,timelimit);
@@ -327,11 +331,12 @@ contract FastPriceFeed is IFastPriceFeed, AccessControlEnumerable {
         require(_isSupported[_asset], 'Oracle: do not support this token');
         require(_plans[_asset] == Plan.DEX, "setTwapInterval: Only dex _asset");
         require(
-            MAX_INTERVA >= _twapIntervals[_asset] && _twapIntervals[_asset] >= MIN_INTERVA,
+            MAX_INTERVA >= _twapInterval && _twapInterval >= MIN_INTERVA,
             'setTwapInterval: Invalid twapInterval'
         );
-        emit SetTwapInterval(_asset, _twapIntervals[_asset], _twapInterval);
         _twapIntervals[_asset] = _twapInterval;
+        emit SetTwapInterval(_asset, _twapIntervals[_asset], _twapInterval);
+        
     }
 
     function getPriceFromDex(address _asset) internal view returns (uint256 price) {
