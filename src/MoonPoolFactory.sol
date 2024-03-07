@@ -17,12 +17,15 @@ import './interfaces/IMoonPoolFactory.sol';
 
 contract MoonPoolFactory is IMoonPoolFactory,  ReentrancyGuard {
 
-     using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20;
     using Strings for uint256;
 
+    uint256 private constant CREATOR_REWARD_MAX = 2000;
+    address private _multiSigWallet;
     address[] private _moonPools;
     BaseConfig private _cfg;
     mapping(address => bool) private _isSupported;
+    
 
     function baseConfig() external view returns (BaseConfig memory ) {
             return _cfg;
@@ -40,25 +43,46 @@ contract MoonPoolFactory is IMoonPoolFactory,  ReentrancyGuard {
         return _isSupported[_asset];
     }
 
-    constructor(BaseConfig memory _initCfg, address[] memory _initAssets) {
+    constructor(BaseConfig memory _initCfg, address[] memory _initAssets, address _initMultiSigWallet) {
         _cfg = _initCfg;
         for (uint i=0; i < _initAssets.length; i++) {
             _isSupported[_initAssets[i]] = true;
             emit UpdateAsset(_initAssets[i], true);
         }
+        _multiSigWallet = _initMultiSigWallet;
     }
+
+    function updateAssets(address _asset, bool isSupport) external {
+        if (_multiSigWallet != msg.sender) revert E_sigWallet();
+        _isSupported[_asset] = isSupport;
+        emit UpdateAsset(_asset, isSupport);
+    } 
+
+    function updateInitAmountMin(uint256 _newInitAmountMin) external {
+        if (_multiSigWallet != msg.sender) revert E_sigWallet();
+        _cfg.initAmountMin = _newInitAmountMin;
+        emit UpdateInitAmountMin(_newInitAmountMin);
+    } 
 
     function createMoonPool(
         AddMoonPool calldata _addPool,
         IMoonPool.InputRule[] calldata _rules
     ) external nonReentrant {
         if (!_isSupported[_addPool.srcAsset]) revert E_asset();
-        uint8 decimals = IERC20Metadata(_addPool.srcAsset).decimals();
-        if (_addPool.initAmount < 100000 * (10 ** decimals)) revert E_initAmount();
-        // _sellLimitCapRatio 20%-50%
-        if (_addPool.sellLimitCapRatio < 2000 || _addPool.sellLimitCapRatio > 5000) revert E_sellLimit();
+        if (_addPool.initAmount < _cfg.initAmountMin) revert E_initAmount();
+        // _sellLimitCapRatio 30%-50%
+        if (_addPool.sellLimitCapRatio < 3000 || _addPool.sellLimitCapRatio > 5000) revert E_sellLimit();
          // triggerRewardRatio: 0-20%
         if (_addPool.triggerRewardRatio > 2000) revert E_triggerReward();
+        if (_addPool.duration < 1 days) revert E_duration();
+        if (_addPool.cap < _addPool.initAmount) revert E_cap();
+        if (_addPool.creatorRewardRatio > CREATOR_REWARD_MAX) revert E_rewardRatio();
+
+         IDoubler doubler = IDoubler(_cfg.doubler);
+        for (uint32 i = 0; i < _rules.length; ++i) {
+            if (!doubler.getAssetConfigMap(_rules[i].asset).isOpen) revert E_asset();
+            _ruleCheck(_rules[i]);
+        }
         // create pool
         string memory lpName = string.concat('MP-', (_moonPools.length + 1).toString());
         IMoonPool.Pool memory pcfg;
@@ -71,22 +95,30 @@ contract MoonPoolFactory is IMoonPoolFactory,  ReentrancyGuard {
         pcfg.priceFeed = _cfg.priceFeed;
         pcfg.swapRouter = _cfg.swapRouter;
         pcfg.asset = _addPool.srcAsset;
+        pcfg.capMax =  _addPool.cap;
+        pcfg.endTime = block.timestamp + _addPool.duration;
         pcfg.creatorRewardRatio = _addPool.creatorRewardRatio;
         pcfg.triggerRewardRatio = _addPool.triggerRewardRatio;
         pcfg.sellLimitCapRatio = _addPool.sellLimitCapRatio;
         {   
             // create
-            MoonPool pool = new MoonPool(lpName, lpName, pcfg, _rules, _addPool.duration, _addPool.cap, _addPool.initAmount);
+            MoonPool pool = new MoonPool(lpName, lpName, pcfg, _rules);
             _moonPools.push(address(pool));
-            // for test.
             IDBRFarm(_cfg.dbrFarm).addMoonPoolRole(address(pool));
             emit CreateMoonPool(_moonPools.length, address(pool), _addPool.srcAsset, _addPool.duration, _addPool.cap, _addPool.initAmount, _addPool.creatorRewardRatio);
-
             // buy lp
             IERC20(_addPool.srcAsset).safeTransferFrom(msg.sender, address(this), _addPool.initAmount);
             IERC20(_addPool.srcAsset).approve(address(pool), _addPool.initAmount);
             pool.buy(_addPool.initAmount, pcfg.creator);
         }
-        
+    }
+    
+    function _ruleCheck(IMoonPool.InputRule memory _ir) internal pure {
+        if (_ir.fallRatioMin > _ir.fallRatioMax || _ir.fallRatioMin < 50 || _ir.fallRatioMax >= 8000) revert E_fallRatio();
+        if (_ir.profitRatioMin >  _ir.profitRatioMax || _ir.profitRatioMin < 50) revert E_profitRatio();
+        if (_ir.rewardRatioMax > 10000 || _ir.rewardRatioMin > _ir.rewardRatioMax) revert E_rewardRatioMax();
+        if (_ir.winnerRatioMax > 10000 || _ir.winnerRatioMin > _ir.winnerRatioMax) revert E_winnerRatioMax();
+        if (_ir.tvl == 0) revert E_tvl();
+        if (_ir.layerInputMax == 0) revert E_layerInput();
     }
 }

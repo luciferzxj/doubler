@@ -86,7 +86,7 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
         if (_newPool.unitSize == 0 || _newPool.units == 0) revert E_Units();
         if (_newPool.fallRatio < 50 || _newPool.fallRatio >= 8000) revert E_FallRatio();
         if (_newPool.double < 2 || _newPool.double > 5) revert E_Double();
-        if (_newPool.profitRatio < 50 || _newPool.profitRatio > RATIO_PRECISION) revert E_ProfitRatio();
+        if (_newPool.profitRatio < 50) revert E_ProfitRatio();
         if (_newPool.rewardRatio > RATIO_PRECISION) revert E_RewardRatio();
         if (_newPool.maxRewardUnits == 0) revert E_MaxRewardUnits();
         if (_newPool.winnerRatio > RATIO_PRECISION) revert E_WinnerRatio();
@@ -109,7 +109,7 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
         addInput.amount = addInput.margin;
         addInput.curPrice = _getPrice(_newPool.asset);
         if (_newPool.unitSize.mul(addInput.curPrice).div(10 ** decimals) < 10 * 1e18) revert E_UnitSize();
-
+        
         emit NewPool(
             _lastPoolId,
             _msgSender(),
@@ -415,7 +415,6 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
                 _nft.layerRanking
             );
             if (winRes.isWinner) {
-                // (rewardAmount - rewardEcoFee) * winnerRatio * rewardUnits/winnerRange
                 winAmount = poolProfit
                     .rewardAmount
                     .sub(poolProfit.rewardEcoFee)
@@ -518,7 +517,7 @@ contract Doubler is IDoubler, AccessControlEnumerable, ReentrancyGuard {
         }
         IFRNFT(_FRNFT).burnFrom(_msgSender(), _tokenId);
         emit Gain(_tokenId, nft.poolId, _msgSender(), available.sub(winnerReward), winnerReward, fee);
-        return available.sub(fee);
+        return available > 0 ? available.sub(fee) : 0;
     }
 
     function getWinnerRange(uint256 _poolId) external view returns (uint256) {

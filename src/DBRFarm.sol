@@ -11,7 +11,7 @@ import './interfaces/IFRNFT.sol';
 import './interfaces/IDBR.sol';
 import './interfaces/IDoubler.sol';
 import './interfaces/IDBRFarm.sol';
-// import 'forge-std/console.sol';
+import 'hardhat/console.sol';
 
 // import Upgradeable
 import '@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol';
@@ -269,12 +269,12 @@ contract DBRFarm is
         _updateAssetPool(pool.asset);
         _tvlTotal = _tvlTotal - _doublerMap[_doublerId].tvl;
         (,,,,uint256 tvlTotal,,,,) = IDoubler(_doubler).getPrivateVar();
-        if (pool.tvl * 10 >= tvlTotal) {
+        if (pool.tvl * 100 >= tvlTotal) {
            _doublerMap[_doublerId].isBoost = true; 
         }
         _doublerMap[_doublerId].endBlockNo = block.number;
         _doublerMap[_doublerId].endPerShare = _getPerShare(pool.asset);
-        emit EndDoubler(_doublerId, _msgSender());
+        emit EndDoubler(_doublerId, _msgSender(), _doublerMap[_doublerId].isBoost);
     }
 
     function _updateAssetPool(address _asset) internal  {

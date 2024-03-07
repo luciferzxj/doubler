@@ -286,10 +286,57 @@ contract DoublerHelper is
             pools[i].symbol = IERC20Metadata(pool.asset).symbol();
             pools[i].tvl = pool.pendingValue + poolBlance;
             pools[i].lpPrice = IMoonPool(lpAddr).getLPValue();
-            pools[i].buyLimit =  pools[i].tvl > pool.capMax ? 0 : pool.capMax - pools[i].tvl;
-            pools[i].sellLimit =  poolBlance > pools[i].tvl * pool.sellLimitCapRatio / RATIO_PRECISION ? poolBlance - pools[i].tvl * pool.sellLimitCapRatio / RATIO_PRECISION : 0;
+            pools[i].buyLpLimit =  pools[i].tvl > pool.capMax ? 0 : (pool.capMax - pools[i].tvl);
+            pools[i].sellLpLimit =  poolBlance;
+            if (pool.pendingValue > 0)  {
+                 pools[i].sellLpLimit =  poolBlance > pool.pendingValue * pool.sellLimitCapRatio / RATIO_PRECISION ? poolBlance - pool.pendingValue * pool.sellLimitCapRatio / RATIO_PRECISION : 0;
+            }
+            pools[i].buyLpLimit = pools[i].buyLpLimit  * (10 ** IERC20Metadata(pool.asset).decimals()) /  pools[i].lpPrice;
+            pools[i].sellLpLimit = pools[i].sellLpLimit * (10 ** IERC20Metadata(pool.asset).decimals()) /  pools[i].lpPrice;
         }
         return pools;
+    }
+
+
+    function getValidDoublerForMoonPool(address lpAddress, uint128[] memory doublerIds) external view returns (uint128[] memory retIds) {
+        IMoonPool.Pool memory pool = IMoonPool(lpAddress).poolInfo();
+        PoolView memory pv; 
+        uint256 price;
+        uint32 layer;
+        uint256 unitSizeValue;
+        uint256 balance ;
+        IMoonPool.InputRule memory rule;
+        IDoubler.LayerData memory layerData;
+        retIds = new uint128[](doublerIds.length);
+        for (uint16 i =0; i < doublerIds.length; i ++) {
+            pv = getPoolView(doublerIds[i]);
+            // doubler status
+            if (pv.isInput == false) {
+                continue;
+            }
+            // balance <> unitSize
+            price = IFastPriceFeed(_fastPriceFeed).getPrice(pv.asset);
+            unitSizeValue = pv.unitSize * price / (10 ** IERC20Metadata(pool.asset).decimals());
+            balance = IERC20Metadata(pool.asset).balanceOf(lpAddress);
+            if (unitSizeValue > balance) {
+                continue;  
+            }
+            // layerInputMax <> unitSizeValue
+            rule = IMoonPool(lpAddress).ruleMap(pv.asset);
+            if (unitSizeValue > rule.layerInputMax) {
+                continue; 
+            }
+            // layer is input
+            layer = pv.lastLayer;
+            layerData = IDoubler(_doublerAddress).getLayerData(pv.id, layer);
+            if (layerData.cap <= layerData.amount) {
+                layer += 1;
+            }
+            if (IMoonPool(lpAddress).inputLayer(pv.id, layer)) {
+                 continue;
+            }
+            retIds[i] = doublerIds[i];
+        }
     }
 
 }
