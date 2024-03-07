@@ -107,11 +107,10 @@ async function main() {
   // todo init Aggregator
   const uniV3Router = ethers.utils.getAddress('0xE592427A0AEce92De3Edee1F18E0157C05861564')
   const uniV2Router = ethers.utils.getAddress('0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506')
-  let cfg = {
-    uniswapV3Router: uniV3Router,
-    uniswapV2Router: uniV2Router,
-  }
+  let cfg = [uniV3Router,uniV2Router]
+
   await deployContract('Aggregator', [cfg, ethers.utils.getAddress('0x686cFfb90EB812d39Cf3bc60f87e2F41373c2893')])
+  
   // deploy dbr
 
   // await deployContract('Token', ["Test Doubler Token", "DBR"])

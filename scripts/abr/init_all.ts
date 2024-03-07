@@ -4,15 +4,13 @@ import { BigNumber, } from 'ethers'
 const ethers = require('ethers')
 const DBRABI = require('../../abis/DBR.json')
 const TokenABI = require('../../abis/token.json')
-const DBRFarmABI = require('../../abis/DBRFarm.json')
+// const DBRFarmABI = require('../../abis/DBRFarm.json')
 const FRNFTABI = require('../../abis/FRNFT.json')
 const DoublerPoolABI = require('../../abis/Doubler.json')
 const DoublerQueryABI = require('../../abis/DoublerHelper.json')
 const FastPriceFeedABI = require('../../abis/FastPriceFeed.json')
 const SwapRouterABI = require('../../abis/Aggregator.json')
 const dotenv = require('dotenv')
-
-
 
 dotenv.config()
 
@@ -133,7 +131,6 @@ async function initMain() {
   rt = await tx.wait()
   console.log(`doublerHelper.updateMoonPoolPriceTokens, tx status ${rt.status}, transactionHash : ${rt.transactionHash} `)
 
-  
   //fastPriceFeed
   let chainlink = ethers.utils.getAddress('0xb2A824043730FE05F3DA2efaFa1CBbe83fa548D6')
   const pyth = ethers.utils.getAddress('0xff1a0f4744e8582DF1aE09D5611b887B6a12925C')
@@ -176,26 +173,27 @@ async function initMain() {
   //aggregator
   //USDT-WETH
   let paths = [
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address", "uint24", "address"], [WETH, 500, ARB, 500, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDT]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDC]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDC]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDC]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDC]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDC]),
-              ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDC])
-            ];
-  let paths2 =[[USDT, WETH],[WETH, USDT],[USDT, ARB],[ARB, USDT],[USDT, MAX],[MAX, USDT],[USDC, WETH],[WETH, USDC],[USDC, ARB],[ARB, USDC],[USDC, MAX],[MAX, USDC]];
-  let ratios =[[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000],[6000,4000]];
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address", "uint24", "address"], [WETH, 500, ARB, 500, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDT]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDC]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDC]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDC]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [ARB, 500, USDC]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDC]),
+    ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [MAX, 10000, USDC])
+  ];
+  let paths2 = [[USDT, WETH], [WETH, USDT], [USDT, ARB], [ARB, USDT], [USDT, MAX], [MAX, USDT], [USDC, WETH], [WETH, USDC], [USDC, ARB], [ARB, USDC], [USDC, MAX], [MAX, USDC]];
+  let ratios = [[6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000], [6000, 4000]];
 
   for (let i = 0; i < paths.length; i++) {
     let data = {
-      path:paths[i],
-      ratio:ratios[i][0],
+      path: paths[i],
+      ratio: ratios[i][0],
+      index :0
     }
     tx = await swapRouter.addUniV3Strategy(paths2[i][0], paths2[i][1], data)
     rt = await tx.wait()
@@ -204,6 +202,7 @@ async function initMain() {
     data = {
       path: paths2[i],
       ratio: ratios[i][1],
+      index:1
     }
     tx = await swapRouter.addUniV2Strategy(paths2[i][0], paths2[i][1], data)
     rt = await tx.wait()
