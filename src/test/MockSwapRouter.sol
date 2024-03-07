@@ -8,27 +8,28 @@ import '@openzeppelin/contracts/utils/Context.sol';
 import '../interfaces/ISwapRouter.sol';
 import '../interfaces/IDBR.sol';
 
-contract MockSwapRouter is Context, ISwapRouter {
-    function buy(
-        address buyAsset,
-        uint256 buyAmount,
-        address spendAsset,
-        uint256 spendAssetMax
-    ) external override returns (uint256 spendAmount) {
-        IDBR(spendAsset).transferFrom(_msgSender(), address(this), spendAssetMax);
-        IDBR(buyAsset).mint(_msgSender(), buyAmount);
-        return spendAssetMax;
+contract MockSwapRouter is Context {
+
+    function swapCustomIn(
+       address tokenIn,
+        uint256 amountInMax,
+        address tokenOut,
+        uint256 amountOut
+    ) external  returns (uint256 spendAmount) {
+        IDBR(tokenIn).transferFrom(_msgSender(), address(this), amountInMax);
+        IDBR(tokenOut).mint(_msgSender(), amountOut);
+        return amountInMax;
     }
 
-    function sell(
-        address sellAseet,
-        uint256 sellAseetAmount,
-        address returnAsset,
-        uint256 returnAssetMax
-    ) external override returns (uint256 returnAmount) {
-        IDBR(sellAseet).transferFrom(_msgSender(), address(this), sellAseetAmount);
-        IDBR(returnAsset).mint(_msgSender(), returnAssetMax);
-        return returnAssetMax;
+    function swapCustomOut(
+         address tokenIn,
+         uint256 amountIn,
+         address tokenOut,
+         uint256 amountOutMin
+    ) external  returns (uint256 returnAmount) {
+        IDBR(tokenIn).transferFrom(_msgSender(), address(this), amountIn);
+        IDBR(tokenOut).mint(_msgSender(), amountOutMin);
+        return amountOutMin;
     }
 
     function getSlippage() external view returns (uint256 slippage) {
