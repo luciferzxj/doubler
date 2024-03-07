@@ -77,7 +77,7 @@ describe.only('Aggregator Case List', () => {
         const MockUniv3: SwapRouter__factory = await ethers.getContractFactory('swapRouter', owner)
         uniV3Router = await MockUniv3.deploy()
         await uniV3Router.deployed()
-        let temp = [uniV3Router.address,uniV2Router.address]
+        let temp = [uniV3Router.address]
         const MockSwapRouter: Aggregator__factory = await ethers.getContractFactory('Aggregator', owner)
         aggregator = await MockSwapRouter.deploy(temp, owner.address)
         await aggregator.deployed()
@@ -95,6 +95,12 @@ describe.only('Aggregator Case List', () => {
 
     })
     describe('aggregator main case', () => {
+        it('case: add Router ', async () => {
+            await addRouter()
+        })
+        it('case: delete Router ', async () => {
+            await deleteRouter()
+        })
         it('case: deploy uniV2 ', async () => {
             await deployUniV2()
         })
@@ -104,7 +110,9 @@ describe.only('Aggregator Case List', () => {
         it('case: set Strategy ', async () => {
             await setStrategy()
         })
-
+        it('case: update Strategy ', async () => {
+            await updateStrategy()
+        })
         it('case: test swapCustomIn ', async () => {
             await testSwapIn()
         })
@@ -114,7 +122,16 @@ describe.only('Aggregator Case List', () => {
 
 
     })
+    async function addRouter(){
+        await aggregator.addRouter(uniV2Router.address)
+        await aggregator.addRouter(uniV2Router.address)
+    }
+    async function deleteRouter(){
+        await addRouter()
+        await aggregator.deleteRouter(2)
+    }
     async function deployUniV2() {
+        await deleteRouter()
         await USDT.mint(4000000 * 10 ** 6);
         await DAI.mint(ether.mul(3000000));
         await USDC.mint(2000000 * 10 ** 6);
@@ -208,7 +225,7 @@ describe.only('Aggregator Case List', () => {
         let path = ethers.utils.defaultAbiCoder.encode(type, [USDT.address, 100, DAI.address])
         let data = {
             path: path,
-            ratio: 5000,
+            ratio: 4000,
             index:0
         }
         await aggregator.addUniV3Strategy(DAI.address, USDT.address, data)
@@ -233,7 +250,7 @@ describe.only('Aggregator Case List', () => {
 
         data2 = {
             path: [USDT.address, USDC.address, DAI.address],
-            ratio: 4000,
+            ratio: 3000,
             index:1
         }
         await aggregator.addUniV2Strategy(USDT.address, DAI.address, data2)
@@ -244,164 +261,31 @@ describe.only('Aggregator Case List', () => {
             index:1
         }
         await aggregator.addUniV2Strategy(USDT.address, DAI.address, data2)
-        //DAI-USDC
-        path = ethers.utils.defaultAbiCoder.encode(type, [USDC.address, 100, DAI.address])
-        data = {
+    }
+    async function updateStrategy(){
+        await setStrategy()
+        let path = ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [USDT.address, 100, DAI.address])
+        let data = {
             path: path,
             ratio: 5000,
             index:0
         }
-        await aggregator.addUniV3Strategy(DAI.address, USDC.address, data)
+        await aggregator.updateUniV3Strategy(DAI.address, USDT.address, data,0)
 
-        data2 = {
-            path: [DAI.address, USDC.address],
-            ratio: 5000,
+        let data2 = {
+            path: [USDT.address, USDC.address, DAI.address],
+            ratio: 3000,
             index:1
         }
-        await aggregator.addUniV2Strategy(DAI.address, USDC.address, data2)
-        //USDC-DAI
-        path = ethers.utils.defaultAbiCoder.encode(type, [USDC.address, 100, DAI.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(USDC.address, DAI.address, data)
-
-        data2 = {
-            path: [USDC.address, DAI.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(USDC.address, DAI.address, data2)
-        //DAI-OP
-        path = ethers.utils.defaultAbiCoder.encode(type, [OP.address, 100, DAI.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(DAI.address, OP.address, data)
-
-        data2 = {
-            path: [DAI.address, OP.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(DAI.address, OP.address, data2)
-        //OP-DAI
-        path = ethers.utils.defaultAbiCoder.encode(type, [OP.address, 100, DAI.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(OP.address, DAI.address, data)
-
-        data2 = {
-            path: [OP.address, DAI.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(OP.address, DAI.address, data2)
-        //USDT-USDC
-        path = ethers.utils.defaultAbiCoder.encode(type, [USDC.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(USDT.address, USDC.address, data)
-
-        data2 = {
-            path: [USDT.address, USDC.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(USDT.address, USDC.address, data2)
-        //USDC-USDT
-        path = ethers.utils.defaultAbiCoder.encode(type, [USDC.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(USDC.address, USDT.address, data)
-
-        data2 = {
-            path: [USDC.address, USDT.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(USDC.address, USDT.address, data2)
-        //USDT-OP
-        path = ethers.utils.defaultAbiCoder.encode(type, [OP.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(USDT.address, OP.address, data)
-
-        data2 = {
-            path: [USDT.address, OP.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(USDT.address, OP.address, data2)
-        //OP-USDT
-        path = ethers.utils.defaultAbiCoder.encode(type, [OP.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(OP.address, USDT.address, data)
-
-        data2 = {
-            path: [OP.address, USDT.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(OP.address, USDT.address, data2)
-        //USDT-WETH
-        path = ethers.utils.defaultAbiCoder.encode(type, [WETH.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(USDT.address, WETH.address, data)
-
-        data2 = {
-            path: [USDT.address, WETH.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(USDT.address, WETH.address, data2)
-        //WETH-USDT
-        path = ethers.utils.defaultAbiCoder.encode(type, [WETH.address, 100, USDT.address])
-        data = {
-            path: path,
-            ratio: 5000,
-            index:0
-        }
-        await aggregator.addUniV3Strategy(WETH.address, USDT.address, data)
-
-        data2 = {
-            path: [WETH.address, USDT.address],
-            ratio: 5000,
-            index:1
-        }
-        await aggregator.addUniV2Strategy(WETH.address, USDT.address, data2)
+        await aggregator.updateUniV2Strategy(USDT.address, DAI.address, data2,1)
     }
     async function testSwapIn(){
-        await setStrategy()
+        await updateStrategy()
         await DAI.connect(user1).approve(aggregator.address,ether.mul(10500))
         await aggregator.connect(user1).swapCustomIn(DAI.address,ether.mul(10500),USDT.address,ether.mul(10000).div(1000000000000))
     }
     async function testSwapOut(){
-        await setStrategy()
+        await updateStrategy()
         await USDT.connect(user1).approve(aggregator.address,ether.mul(10500))
         await aggregator.connect(user1).swapCustomOut(USDT.address,ether.mul(10000).div(1000000000000),DAI.address,ether.mul(9800))
     }
