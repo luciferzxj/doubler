@@ -4,26 +4,21 @@ pragma solidity ^0.8.12;
 
 interface IMoonPool {
 
-    error E_duration();
     error E_cap();
-    error E_rewardRatio();
-    error E_rules();
-    error E_fallRatio();
-    error E_profitRatio();
-    error E_rewardRatioMax();
-    error E_winnerRatioMax();
-    error E_tvl();
     error E_sell_limit();
     error E_pool_end();
     error E_pool_check();
     error E_creator();
     error E_asset();
     error E_poolend();
-    error E_layerInput();
     error E_balance();
     error E_layer_close();
-    error E_Approve();
     error E_input_max();
+    error E_input_price();
+    error E_input_balance();
+    error E_input_mergin();
+    error E_input_layer();
+    
     
     
     struct Pool {
@@ -31,6 +26,7 @@ interface IMoonPool {
         uint16 creatorRewardRatio;
         uint16 triggerRewardRatio;
         uint16 sellLimitCapRatio;
+        uint256 capMax;
         address creator;
         address eco;
         address asset;
@@ -44,9 +40,9 @@ interface IMoonPool {
         uint256 pendingValue; 
         uint256 output;
         uint256 input;
-        uint256 capMax;
-        uint256 dbrAmount;
+        // uint256 dbrAmount;
         uint256 endTime;
+        uint256 triggerDbrShare;
     }
 
     struct InputRule {
@@ -61,13 +57,13 @@ interface IMoonPool {
         uint16 winnerRatioMax;
         uint256 tvl;
         uint256 layerInputMax;
-        // uint24 fee;
     }
 
     struct InputRecord {
         bool isWithdraw;
         uint256 spend;
         uint256 income;
+        uint256 fee;
     }
 
     event Buy(address user, uint256 lpAmount, uint256 spendAmount, uint256 balance, uint256 pending,  uint256 lpPrice);
@@ -87,8 +83,10 @@ interface IMoonPool {
         uint256 tvl,
         uint256 layerInputMax
     );
-    
-    event CostBill(uint256 indexed doublerId, uint256  indexed tokenId, uint8 billType,  uint256 output,  uint256 input, uint256 dbr, uint256 balance, uint256 pending,  uint256 lpPrice);
+
+    // event Input(uint256 indexed doublerId, uint256  indexed tokenId, uint256 layer, uint256 spendAmount);
+    // event Output(uint256 indexed doublerId, uint256  indexed tokenId, uint256 spendAmount, uint256 incomeAmount, uint256 fee);
+    event CostBill(uint256 indexed doublerId, uint256  indexed tokenId, uint8 billType,  uint256 output,  uint256 input, uint256 dbr, uint256 balance, uint256 pending,  uint256 lpPrice, uint256 fee);
 
     function updateRule(InputRule calldata _inputRule) external;
 
@@ -100,8 +98,6 @@ interface IMoonPool {
     
     function output(uint256 _tokenId) external;
 
-    function getFactory() external view returns (address);
-
     function inputRecord(uint256 _tokenId) external view returns (InputRecord memory record);
 
     function poolInfo() external view returns (Pool memory pool);
@@ -109,4 +105,6 @@ interface IMoonPool {
     function ruleMap(address _asset) external view returns (InputRule memory rule);
 
     function getLPValue () external view returns (uint256);
+
+    function inputLayer(uint256 _doubleId, uint256 _layerId) external view returns (bool isInput);
 }

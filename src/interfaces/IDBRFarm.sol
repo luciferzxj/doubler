@@ -32,9 +32,8 @@ interface IDBRFarm {
         uint256 startBlockNo;
         uint256 endBlockNo;
     }
-
     event Staking(uint256 indexed tokenId, address depositor, uint256 addTvl);
-    event EndDoubler(uint256 indexed doublerId, address from);
+    event EndDoubler(uint256 indexed doublerId, address from, bool isBoost);
     event Claim(uint256 indexed doublerId, address to, uint256  tokenId, uint256 claimAmount);
     event UpdateEndReward(uint16 _newEndReward);
     event UpdateAssetPerBlock(address _asset, uint256 _perBlock);

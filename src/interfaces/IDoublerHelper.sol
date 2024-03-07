@@ -83,8 +83,8 @@ interface IDoublerHelper {
         uint256 output;
         uint256 input;
         uint256 lpPrice;
-        uint256 buyLimit;
-        uint256 sellLimit;
+        uint256 buyLpLimit;
+        uint256 sellLpLimit;
     }
     
     function getDoublerAllowAssets() external view returns (TokenMeta[] memory res);
@@ -110,4 +110,5 @@ interface IDoublerHelper {
     function userMoonPoolLpView(address from) external view returns(uint256 tvlTotal, UserLpView[] memory list);
     function getMoolPoolTvl() external view returns(uint256 tvl);
     function getMoolPoolList(uint128[] memory poolIds) external view returns(MoonPoolView[] memory pools);
+    function getValidDoublerForMoonPool(address lpAddress, uint128[] memory doublerIds) external view returns (uint128[] memory retIds);
 }
