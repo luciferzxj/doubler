@@ -7,20 +7,29 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import './interfaces/IUniswapV3SwapRouter.sol';
 import './interfaces/IUniswapV2Router.sol';
 import './interfaces/ISwapRouter.sol';
-
 contract Aggregator is ISwapRouter, Ownable, AccessControlEnumerable {
     address private _multiSigWallet;
     uint256 private _slippage = 50;
     uint256 constant BASE_RATIO = 10000;
     uint256 constant DEADLINE = 1 minutes;
     mapping(bytes32 => Strategy) public strategys;
-    RouterConfig cfg;
+
+    address[] public cfg;
 
     event UpdateSlippage(uint256 _newSlippage);
 
-    constructor(RouterConfig memory _cfg, address _initMultiSigWallet) {
+    constructor(address[] memory _cfg, address _initMultiSigWallet) {
         cfg = _cfg;
         _multiSigWallet = _initMultiSigWallet;
+    }
+
+    function addRouter(address _newRouter)external onlyOwner{
+        cfg.push(_newRouter);
+    }
+
+    function deleteRouter(uint256 index)external onlyOwner{
+        cfg[index] = cfg[cfg.length-1];
+        cfg.pop();
     }
 
     function updateSlippage(uint256 _newSlippage) external {
@@ -81,12 +90,10 @@ contract Aggregator is ISwapRouter, Ownable, AccessControlEnumerable {
         require(str.totalRatio == 10000, 'total ratio incorrect');
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountInMax);
         if (str.v2Data.length > 0) {
-            IERC20(tokenIn).approve(cfg.uniswapV2Router, amountInMax);
-            amountIn += _uniV2OutputSwap(str, amountOut, amountInMax);
+            amountIn += _uniV2OutputSwap(str,tokenIn, amountOut, amountInMax);
         }
         if (str.v3Data.length > 0) {
-            IERC20(tokenIn).approve(cfg.uniswapV3Router, amountInMax);
-            amountIn += _uniV3OutputSwap(str, amountOut, amountInMax);
+            amountIn += _uniV3OutputSwap(str,tokenIn, amountOut, amountInMax);
         }
         IERC20(tokenIn).transfer(msg.sender, amountInMax - amountIn);
     }
@@ -102,39 +109,45 @@ contract Aggregator is ISwapRouter, Ownable, AccessControlEnumerable {
         require(str.totalRatio == 10000, 'total ratio incorrect');
         IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
         if (str.v2Data.length > 0) {
-            IERC20(tokenIn).approve(cfg.uniswapV2Router, amountIn);
-            returnAmount += _uniV2InputSwap(str, amountIn, amountOutMin);
+            returnAmount += _uniV2InputSwap(str,tokenIn, amountIn, amountOutMin);
         }
         if (str.v3Data.length > 0) {
-            IERC20(tokenIn).approve(cfg.uniswapV3Router, amountIn);
-            returnAmount += _uniV3InputSwap(str, amountIn, amountOutMin);
+            returnAmount += _uniV3InputSwap(str,tokenIn, amountIn, amountOutMin);
         }
     }
 
     function _uniV3OutputSwap(
         Strategy memory str,
+        address tokenIn,
         uint256 amountOut,
         uint256 amountInMax
     ) internal returns (uint256 spendAmount) {
         IUniV3SwapRouter.ExactOutputParams memory para;
+        address currentRouter;
         for (uint i = 0; i < str.v3Data.length; i++) {
             para.path = str.v3Data[i].path;
             para.recipient = msg.sender;
             para.deadline = block.timestamp + DEADLINE;
             para.amountOut = (amountOut * str.v3Data[i].ratio) / BASE_RATIO;
             para.amountInMaximum = (amountInMax * str.v3Data[i].ratio) / BASE_RATIO;
-            spendAmount += IUniV3SwapRouter(cfg.uniswapV3Router).exactOutput(para);
+            currentRouter = cfg[uint256(str.v3Data[i].index)];
+            IERC20(tokenIn).approve(currentRouter, amountInMax);
+            spendAmount += IUniV3SwapRouter(currentRouter).exactOutput(para);
         }
     }
 
     function _uniV2OutputSwap(
         Strategy memory str,
+        address tokenIn,
         uint256 amountOut,
         uint256 amountInMax
     ) internal returns (uint256 spendAmount) {
+        address currentRouter;
         for (uint i = 0; i < str.v2Data.length; i++) {
             amountOut = (amountOut * str.v2Data[i].ratio) / BASE_RATIO;
-            spendAmount += IUniswapV2Router(cfg.uniswapV2Router).swapTokensForExactTokens(
+            currentRouter = cfg[uint256(str.v2Data[i].index)];
+            IERC20(tokenIn).approve(currentRouter, amountInMax);
+            spendAmount += IUniswapV2Router(currentRouter).swapTokensForExactTokens(
                 amountOut,
                 amountInMax * str.v2Data[i].ratio / BASE_RATIO,
                 str.v2Data[i].path,
@@ -146,27 +159,35 @@ contract Aggregator is ISwapRouter, Ownable, AccessControlEnumerable {
 
     function _uniV3InputSwap(
         Strategy memory str,
+        address tokenIn,
         uint256 amountIn,
         uint256 amountOutMin
     ) internal returns (uint256 returnAmount) {
         IUniV3SwapRouter.ExactInputParams memory para;
+        address currentRouter;
         for (uint i = 0; i < str.v3Data.length; i++) {
             para.path = str.v3Data[i].path;
             para.recipient = msg.sender;
             para.deadline = block.timestamp + DEADLINE;
             para.amountIn = (amountIn * str.v3Data[i].ratio) / BASE_RATIO;
             para.amountOutMinimum = (amountOutMin * str.v3Data[i].ratio) / BASE_RATIO;
-            returnAmount += IUniV3SwapRouter(cfg.uniswapV3Router).exactInput(para);
+            currentRouter = cfg[uint256(str.v3Data[i].index)];
+            IERC20(tokenIn).approve(currentRouter, para.amountIn);
+            returnAmount += IUniV3SwapRouter(currentRouter).exactInput(para);
         }
     }
 
     function _uniV2InputSwap(
         Strategy memory str,
+        address tokenIn,
         uint256 amountIn,
         uint256 amountOutMin
     ) internal returns (uint256 returnAmount) {
+        address currentRouter;
         for (uint i = 0; i < str.v2Data.length; i++) {
-            uint[] memory amounts = IUniswapV2Router(cfg.uniswapV2Router).swapExactTokensForTokens(
+            currentRouter = cfg[uint256(str.v2Data[i].index)];
+            IERC20(tokenIn).approve(currentRouter, amountIn);
+            uint[] memory amounts = IUniswapV2Router(currentRouter).swapExactTokensForTokens(
                 (amountIn * str.v2Data[i].ratio) / BASE_RATIO,
                 (amountOutMin * str.v2Data[i].ratio) / BASE_RATIO,
                 str.v2Data[i].path,
