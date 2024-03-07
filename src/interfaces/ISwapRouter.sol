@@ -2,19 +2,26 @@
 pragma solidity ^0.8.12;
 
 interface ISwapRouter {
-    struct RouterConfig {
-        address uniswapV3Router;
-        address uniswapV2Router;
-    }
+    // struct RouterConfig {
+    //     address router;
+    //     Type ty;
+    // }
+    // enum Type {
+    //     UNIV3,
+    //     UNIV2,
+    //     OTHER
+    // }
 
     struct UniV3Data {
         bytes path;
         uint256 ratio;
+        uint256 index;
     }
 
     struct UniV2Data {
         address[] path;
         uint256 ratio;
+        uint256 index;
     }
 
     struct Strategy {
@@ -45,6 +52,10 @@ interface ISwapRouter {
 
     function addUniV2Strategy(address tokenIn, address tokenOut, UniV2Data memory datas) external;
 
+    function addRouter(address _newRouter)external;
+
+    function deleteRouter(uint256 index)external;
+    
     function updateUniV3Strategy(
         address tokenIn,
         address tokenOut,
