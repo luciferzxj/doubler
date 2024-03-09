@@ -171,7 +171,6 @@ async function initMain() {
   rt = await tx.wait()
   console.log(`fastPriceFeed.batchSetAssetPriceLimit, tx status ${rt.status}, transactionHash : ${rt.transactionHash} `)
   //aggregator
-  //USDT-WETH
   let paths = [
     ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address", "uint24", "address"], [WETH, 500, ARB, 500, USDT]),
     ethers.utils.defaultAbiCoder.encode(["address", "uint24", "address"], [WETH, 500, USDT]),
